@@ -1,4 +1,4 @@
-meg_pilot
+meg_playground
 =========
 
-A repo to pilot the MEG study
+A workspace to play with MEG data
