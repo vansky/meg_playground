@@ -4,7 +4,7 @@
 import re
 import sys
 
-DEBUG = True
+DEBUG = False
 
 #depth is final char of POS
 
@@ -64,7 +64,7 @@ badchars = re.compile('[\W_]+')
 for tline in tableFile:
     stline = tline.strip().split()
     
-    if inBAD:
+    if DEBUG and inBAD:
         sys.stderr.write(str(stline)+'\n')
     if inBAD and '<SENT-END>' == stline[3]:
         #skip badly parsed table rows until the end of that sentence
@@ -78,7 +78,7 @@ for tline in tableFile:
         continue
     elif len(stline) < 6:
         #in a non-parsed line
-        sys.stdout.write(tline)
+        sys.stdout.write(tline[:-1]+'\t\n')
         continue
     elif inBAD:
         #in a badparse, so we don't know the depth
