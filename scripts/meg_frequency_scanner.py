@@ -12,13 +12,13 @@
 #This script is taxing enough, and autosaving tends to push it over the edge
 # plus, autosaving seems to zero out the file before restoring it from the backup
 # this means an autosave causing a crash will actually delete the file rather than saving it!!!
-%autosave 0
+#%autosave 0
 
 # <codecell>
 
 #basic imports
 
-%pylab inline
+#%pylab inline
 import time
 import pickle
 import logging as L
@@ -40,7 +40,7 @@ pylab.ion()
 # <codecell>
 
 #custom imports
-%cd ../scripts
+#%cd ../scripts
 
 # brian's prototype routines
 from protoMEEGutils import *
@@ -66,19 +66,6 @@ import protoSpectralWinFFTMapper as specfft
 
 
 #### SUBROUTINES ####
-
-# plot the time-scale for ERFs and other epoch figures 
-def commonPlotProps():
-        #zeroSample = (abs(epochStart)/float(epochLength)*epochNumTimepoints)
-        #pylab.plot((0,epochNumTimepoints),(0,0),'k--')
-        #pylab.ylim((-2.5e-13,2.5e-13)) #((-5e-14,5e-14)) # better way just to get the ones it choose itself?
-        #pylab.plot((zeroSample,zeroSample),(0,0.01),'k--')
-        pylab.xticks(numpy.linspace(0,epochNumTimepoints,7),epochStart+(numpy.linspace(0,epochNumTimepoints,7)/samplingRate))
-        pylab.xlabel('time (s) relative to auditory onset') #+refEvent)
-        pylab.xlim((62,313))
-        pylab.show()
-        pylab.axhline(0, color='k', linestyle='--')
-        pylab.axvline(125, color='k', linestyle='--')
 
 # plot the time-scale for ERFs and other epoch figures 
 def commonPlotProps():
@@ -118,22 +105,22 @@ def mynormalise(A):
 # <codecell>
 
 #change to the data directory to load in the data
-%cd ../MEG_data
+#%cd ../MEG_data
 
 #*# MARTY #*# choose a file - I found participant V to be pretty good, and 0.01 to 50Hz filter is pretty conservative #*#
-(megFileTag1, megFile1) = ('V_TSSS_0.01-50Hz_@125', 'v_hod_allRuns_tsss_audiobookPrepro_stPad1_lp50_resamp125_frac10ICAed.set')#_hp0.010000.set')
-(megFileTag2, megFile2) = ('A_TSSS_0.01-50Hz_@125', 'aud_hofd_a_allRuns_tsss_audiobookPrepro_stPad1_lp50_resamp125_frac10ICAed_hp0.010000.set')
-(megFileTag3, megFile3) = ('C_TSSS_0.01-50Hz_@125', 'aud_hofd_c_allRuns_tsss_audiobookPrepro_stPad1_lp50_resamp125_frac10ICAed_hp0.010000.set')
+(megFileTag1, megFile1) = ('V_TSSS_0.01-50Hz_@125', '../MEG_data/v_hod_allRuns_tsss_audiobookPrepro_stPad1_lp50_resamp125_frac10ICAed_hp0.010000.set')
+(megFileTag2, megFile2) = ('A_TSSS_0.01-50Hz_@125', '../MEG_data/aud_hofd_a_allRuns_tsss_audiobookPrepro_stPad1_lp50_resamp125_frac10ICAed_hp0.010000.set')
+(megFileTag3, megFile3) = ('C_TSSS_0.01-50Hz_@125', '../MEG_data/aud_hofd_c_allRuns_tsss_audiobookPrepro_stPad1_lp50_resamp125_frac10ICAed_hp0.010000.set')
 
 ## put your on properties in here, as a .tab file of similar format (tab delimited, and field names in a first comment line - should be easy to do in excel...)
 #to get the V5.tab:
 #  python ../scripts/buildtab.py hod_JoeTimes_LoadsaFeaturesV3.tab hod.wsj02to21-comparativized-gcg15-1671-4sm.fullberk.parsed.gcgbadwords > hod_JoeTimes_LoadsaFeaturesV4.tab
 #  python ../scripts/addsentid.py hod_JoeTimes_LoadsaFeaturesV4.tab > hod_JoeTimes_LoadsaFeaturesV5.tab
-tokenPropsFile = 'hod_JoeTimes_LoadsaFeaturesV5.tab' # best yet! have automatic Stanford tagging, several word length and freq measures, and also the 2 and 3 token back-grams
+tokenPropsFile = '../MEG_data/hod_JoeTimes_LoadsaFeaturesV5.tab'
 
 # WHICH CHANNELS TO LOOK AT AS ERFS
 #*# MARTY #*# decide which channels to use - channels of interest are the first few you can look at in an ERF, and then from them you can choose one at a time with "channelToAnalyse" for the actual regression analysis #*#
-channelLabels = ['MEG0111', 'MEG0121', 'MEG0131', 'MEG0211', 'MEG0212', 'MEG0213', 'MEG0341']
+#channelLabels = ['MEG0111', 'MEG0121', 'MEG0131', 'MEG0211', 'MEG0212', 'MEG0213', 'MEG0341']
 #?# this way of doing things was a slightly clumsy work-around, cos I didn't have enough memory to epoch all 306 channels at one time
 
 # LOAD WORD PROPS
@@ -168,89 +155,24 @@ baseline = False #[-1,0]
 # <codecell>
 
 # Get the goods on subject 1
-(contSignalData1, metaData1, trackTrials, tokenProps, audioSignal, samplingRate, numChannels) = loadBookMEGWithAudio(megFile1, tokenPropsPickle, triggersOfInterest, epochEnd, epochStart, icaComps=False)
-
-channelsOfInterest = [i for i in range(len(metaData1.chanlocs)) if metaData1.chanlocs[i].labels in channelLabels]
-
-severalMagChannels1 = contSignalData1[channelsOfInterest,:]
-(wordTrials1, epochedSignalData1, epochSliceTimepoints, wordTimesAbsolute, numTrials, epochNumTimepoints) = wordTrialEpochify(severalMagChannels1, samplingRate, tokenProps, trackTrials, refEvent, epochEnd, epochStart)
-
-# <codecell>
-
-del contSignalData1
-del severalMagChannels1
-
-# <codecell>
+(contSignalData1, metaData1, trackTrials, tokenPropsOrig, audioSignal, samplingRate, numChannels) = loadBookMEGWithAudio(megFile1, tokenPropsPickle, triggersOfInterest, epochEnd, epochStart, icaComps=False)
 
 # Get the goods on subject 2
-(contSignalData2, metaData2, trackTrials, tokenProps, audioSignal, samplingRate, numChannels) = loadBookMEGWithAudio(megFile2, tokenPropsPickle, triggersOfInterest, epochEnd, epochStart, icaComps=False)
-severalMagChannels2 = contSignalData2[channelsOfInterest,:]
-(wordTrials2, epochedSignalData2, epochSliceTimepoints, wordTimesAbsolute, numTrials, epochNumTimepoints) = wordTrialEpochify(severalMagChannels2, samplingRate, tokenProps, trackTrials, refEvent, epochEnd, epochStart)
-
-# <codecell>
-
-del contSignalData2
-del severalMagChannels2
-
-# <codecell>
+(contSignalData2, metaData2, trackTrials, tokenPropsOrig, audioSignal, samplingRate, numChannels) = loadBookMEGWithAudio(megFile2, tokenPropsPickle, triggersOfInterest, epochEnd, epochStart, icaComps=False)
 
 # Get the goods on subject 3
-(contSignalData3, metaData3, trackTrials, tokenProps, audioSignal, samplingRate, numChannels) = loadBookMEGWithAudio(megFile3, tokenPropsPickle, triggersOfInterest, epochEnd, epochStart, icaComps=False)
-severalMagChannels3 = contSignalData3[channelsOfInterest,:]
-(wordTrials3, epochedSignalData3, epochSliceTimepoints, wordTimesAbsolute, numTrials, epochNumTimepoints) = wordTrialEpochify(severalMagChannels3, samplingRate, tokenProps, trackTrials, refEvent, epochEnd, epochStart)
+(contSignalData3, metaData3, trackTrials, tokenPropsOrig, audioSignal, samplingRate, numChannels) = loadBookMEGWithAudio(megFile3, tokenPropsPickle, triggersOfInterest, epochEnd, epochStart, icaComps=False)
 
-# <codecell>
+tokenProps = numpy.concatenate((tokenPropsOrig,tokenPropsOrig,tokenPropsOrig),axis=0)
 
-del contSignalData3
-del severalMagChannels3
-
-# <codecell>
-
-epochedSignalData = numpy.concatenate((epochedSignalData1,epochedSignalData2,epochedSignalData3), axis=0)
-print(epochedSignalData.shape)
-tokenProps = numpy.concatenate((tokenProps,tokenProps,tokenProps),axis=0)
-print(tokenProps.shape)
-
-# <markdowncell>
-
-# Plots for Sanity check
-# -----------------
-
-# <codecell>
-
-#pylab.figure()
-#pylab.subplot(2,1,1)
-#pylab.plot(audioSignal)
-#pylab.title('audio signal')
-
-#pylab.subplot(2,1,2)
-#pylab.plot(contSignalData[0,:])
-#pylab.title('first MEG signal')
-
-#pylab.figure()
-#pylab.title('ERF over all tokens, selected channels')
-#pylab.plot( numpy.mean(epochedSignalData,axis=0).T)
-#pylab.legend(channelLabels, loc=4)
-#commonPlotProps()
-
-# <markdowncell>
-
-# Analysis
-# ==========
-
-# <markdowncell>
-
-# Remove undesired trials
-# ----------------------
-
-# <codecell>
+#channelsOfInterest = [i for i in range(len(metaData1.chanlocs)) if metaData1.chanlocs[i].labels in channelLabels]
 
 # REDUCE TRIALS TO JUST THOSE THAT CONTAIN A REAL WORD (NOT PUNCTUATION, SPACES, ...)
 wordTrialsBool = numpy.array([p != '' for p in tokenProps['stanfPOS']])
-print(wordTrialsBool[:10])
+#print(wordTrialsBool[:10])
 # REDUCE TRIALS TO JUST THOSE THAT HAVE A DECENT DEPTH ESTIMATE
 parsedTrialsBool = numpy.array([d != -1 for d in tokenProps['syndepth']])
-print(parsedTrialsBool[:10])
+#print(parsedTrialsBool[:10])
 
 # <codecell>
 
@@ -260,21 +182,52 @@ devitems = numpy.arange(1,max(tokenProps['sentid']),devsizerecip)
 devTrialsBool = numpy.array([s in devitems for s in tokenProps['sentid']])
 testTrialsBool = numpy.array([s not in devitems for s in tokenProps['sentid']])
 
-# <markdowncell>
-
-# Select dataset
-# -----------
-
-# <codecell>
-
 inDataset = devTrialsBool
+freqsource = None # determines how the frequency bands are defined #Can be 'weiss', 'wiki', or an interpolation of the two 
+
+
+for channelix in range(metaData1.chanlocs):
+  severalMagChannels1 = contSignalData1[channelix,:]
+  (wordTrials1, epochedSignalData1, epochSliceTimepoints, wordTimesAbsolute, numTrials, epochNumTimepoints) = wordTrialEpochify(severalMagChannels1, samplingRate, tokenPropsOrig, trackTrials, refEvent, epochEnd, epochStart)
+
+# <codecell>
+#del contSignalData1
+#del severalMagChannels1
 
 # <codecell>
 
-print tokenProps.shape,epochedSignalData.shape
-wordEpochs = epochedSignalData[wordTrialsBool & parsedTrialsBool & inDataset]
-wordFeatures = tokenProps[wordTrialsBool & parsedTrialsBool & inDataset]
-print wordFeatures.shape, wordEpochs.shape
+  severalMagChannels2 = contSignalData2[channelix,:]
+  (wordTrials2, epochedSignalData2, epochSliceTimepoints, wordTimesAbsolute, numTrials, epochNumTimepoints) = wordTrialEpochify(severalMagChannels2, samplingRate, tokenPropsOrig, trackTrials, refEvent, epochEnd, epochStart)
+
+# <codecell>
+
+#del contSignalData2
+#del severalMagChannels2
+
+# <codecell>
+
+  severalMagChannels3 = contSignalData3[channelix,:]
+  (wordTrials3, epochedSignalData3, epochSliceTimepoints, wordTimesAbsolute, numTrials, epochNumTimepoints) = wordTrialEpochify(severalMagChannels3, samplingRate, tokenPropsOrig, trackTrials, refEvent, epochEnd, epochStart)
+
+# <codecell>
+
+#del contSignalData3
+#del severalMagChannels3
+
+# <codecell>
+
+  epochedSignalData = numpy.concatenate((epochedSignalData1,epochedSignalData2,epochedSignalData3), axis=0)
+  #print(epochedSignalData.shape)
+  #print(tokenProps.shape)
+  sys.stderr.write('epochedSignalData.shape: '+str(epochedSignalData.shape)+'\n')
+  raise #need to determine whether we need to reshape with a center column or retain two dimensional...?
+
+# <codecell>
+
+#print tokenProps.shape,epochedSignalData.shape
+  wordEpochs = epochedSignalData[wordTrialsBool & parsedTrialsBool & inDataset] #NB: Might not be 
+  wordFeatures = tokenProps[wordTrialsBool & parsedTrialsBool & inDataset]
+#print wordFeatures.shape, wordEpochs.shape
 
 # <markdowncell>
 
@@ -284,12 +237,12 @@ print wordFeatures.shape, wordEpochs.shape
 # <codecell>
 
 #test reshape outcomes
-a = np.arange(18).reshape((3,2,3))
-print(a) #target: 3 epochs, 2 channels, 3 frequency_features
-b = np.arange(18).reshape((3,6))
-print(b) #fft output: 3 epochs, 2 channels x 3 frequency_features
-c = b.reshape((3,2,3))
-print(c) #reshaped output: 3 epochs, 2 channels, 3 frequency_features
+#a = np.arange(18).reshape((3,2,3))
+#print(a) #target: 3 epochs, 2 channels, 3 frequency_features
+#b = np.arange(18).reshape((3,6))
+#print(b) #fft output: 3 epochs, 2 channels x 3 frequency_features
+#c = b.reshape((3,2,3))
+#print(c) #reshaped output: 3 epochs, 2 channels, 3 frequency_features
 
 # <codecell>
 
@@ -298,71 +251,40 @@ print(c) #reshaped output: 3 epochs, 2 channels, 3 frequency_features
 # index1: channels x fft_feature_types x frequencies
 # solution: reshape the output as (epochs,channels,-1)
 
-print 'wordEpochs: ',wordEpochs.shape
-# Spectrally decompose the epochs
-(mappedTrialFeatures, spectralFrequencies) = specfft.mapFeatures(wordEpochs,samplingRate,windowShape='hann',featureType='amp')
-# Reshape output to get epochs x channels x frequency
-mappedTrialFeatures = mappedTrialFeatures.reshape((wordEpochs.shape[0],wordEpochs.shape[1],-1))
-print 'FFT output: ', mappedTrialFeatures.shape, spectralFrequencies.shape
-
-# <codecell>
-
-# The FFT script collapses across channels
-# index0: epoch
-# index1: channels x fft_feature_types x frequencies
-# solution: reshape the output as epochs,channels,-1
-
 #print 'wordEpochs: ',wordEpochs.shape
-#create a dummy array to permit looping
-#mappedTrialFeatures = numpy.zeros((wordEpochs.shape[0],1,wordEpochs.shape[2]))
-#FIRST = True
-#for i in range(wordEpochs.shape[1]):
-    #for each channel, get a spectral decomposition of it
-    #if FIRST:
-    #    print 'dummy: ', mappedTrialFeatures.shape, '\n'
-    #else:
-    #    print 'real:  ', mappedTrialFeatures.shape, '\n'
-
-    #singleChannelEpochs = wordEpochs[:,i,:].reshape(wordEpochs.shape[0],1,-1)
-    ##(mappedTrialFeaturesRun, spectralFrequencies) = specfft.mapFeatures(singleChannelEpochs,samplingRate,windowShape='hann',featureType='amp')
-    #mappedTrialFeaturesRun = singleChannelEpochs[:,:,:-1]
-
-    #print 'run:   ',mappedTrialFeaturesRun.shape
-    #mappedTrialFeaturesRun = mappedTrialFeaturesRun.reshape(mappedTrialFeaturesRun.shape[0],1,-1)
-    #if FIRST:
-    #    mappedTrialFeatures = numpy.copy(mappedTrialFeaturesRun)
-    #else:
-    #    mappedTrialFeatures = numpy.concatenate((mappedTrialFeatures,mappedTrialFeaturesRun),axis=1)
-    #FIRST = False
-#print 'final: ',mappedTrialFeatures.shape
+# Spectrally decompose the epochs
+  (mappedTrialFeatures, spectralFrequencies) = specfft.mapFeatures(wordEpochs,samplingRate,windowShape='hann',featureType='amp')
+# Reshape output to get epochs x channels x frequency
+  mappedTrialFeatures = mappedTrialFeatures.reshape((wordEpochs.shape[0],wordEpochs.shape[1],-1))
+#print 'FFT output: ', mappedTrialFeatures.shape, spectralFrequencies.shape
 
 # <codecell>
 
-print(spectralFrequencies)
-freqsource = None #Can be 'weiss', 'wiki', or an interpolation of the two
-if freqsource == 'weiss':
-    #Weiss et al. 05
-    theta = numpy.nonzero( (spectralFrequencies >= 4) & (spectralFrequencies <= 7) )
-    beta1 = numpy.nonzero( (spectralFrequencies >= 13) & (spectralFrequencies <= 18) )
-    beta2 = numpy.nonzero( (spectralFrequencies >= 20) & (spectralFrequencies <= 28) )
-    gamma = numpy.nonzero( (spectralFrequencies >= 30) & (spectralFrequencies <= 34) )
-elif freqsource == 'wiki':
-    # end of http://en.wikipedia.org/wiki/Theta_rhythm
-    delta = numpy.nonzero( (spectralFrequencies >= 0.1) & (spectralFrequencies <= 3) )
-    theta = numpy.nonzero( (spectralFrequencies >= 4) & (spectralFrequencies <= 7) )
-    alpha = numpy.nonzero( (spectralFrequencies >= 8) & (spectralFrequencies <= 15) )
-    beta = numpy.nonzero( (spectralFrequencies >= 16) & (spectralFrequencies <= 31) )
-    gamma = numpy.nonzero( (spectralFrequencies >= 32) & (spectralFrequencies <= 100) )
-else:
-    #Interpolate between weiss and wiki
-    #print(numpy.nonzero((spectralFrequencies >= 4) & (spectralFrequencies <= 7)))
-    theta = numpy.nonzero( (spectralFrequencies >= 4) & (spectralFrequencies <= 7) )
-    alpha = numpy.nonzero( (spectralFrequencies >= 8) & (spectralFrequencies < 13) )
-    beta1 = numpy.nonzero( (spectralFrequencies >= 13) & (spectralFrequencies <= 18) )
-    beta2 = numpy.nonzero( (spectralFrequencies >= 20) & (spectralFrequencies <= 28) )
-    gamma = numpy.nonzero( (spectralFrequencies >= 30) & (spectralFrequencies <= 34) )
-print(theta)
-print(theta[0])
+#print(spectralFrequencies)
+
+  if freqsource == 'weiss':
+      #Weiss et al. 05
+      theta = numpy.nonzero( (spectralFrequencies >= 4) & (spectralFrequencies <= 7) )
+      beta1 = numpy.nonzero( (spectralFrequencies >= 13) & (spectralFrequencies <= 18) )
+      beta2 = numpy.nonzero( (spectralFrequencies >= 20) & (spectralFrequencies <= 28) )
+      gamma = numpy.nonzero( (spectralFrequencies >= 30) & (spectralFrequencies <= 34) )
+  elif freqsource == 'wiki':
+      # end of http://en.wikipedia.org/wiki/Theta_rhythm
+      delta = numpy.nonzero( (spectralFrequencies >= 0.1) & (spectralFrequencies <= 3) )
+      theta = numpy.nonzero( (spectralFrequencies >= 4) & (spectralFrequencies <= 7) )
+      alpha = numpy.nonzero( (spectralFrequencies >= 8) & (spectralFrequencies <= 15) )
+      beta = numpy.nonzero( (spectralFrequencies >= 16) & (spectralFrequencies <= 31) )
+      gamma = numpy.nonzero( (spectralFrequencies >= 32) & (spectralFrequencies <= 100) )
+  else:
+      #Interpolate between weiss and wiki
+      #print(numpy.nonzero((spectralFrequencies >= 4) & (spectralFrequencies <= 7)))
+      theta = numpy.nonzero( (spectralFrequencies >= 4) & (spectralFrequencies <= 7) )
+      alpha = numpy.nonzero( (spectralFrequencies >= 8) & (spectralFrequencies < 13) )
+      beta1 = numpy.nonzero( (spectralFrequencies >= 13) & (spectralFrequencies <= 18) )
+      beta2 = numpy.nonzero( (spectralFrequencies >= 20) & (spectralFrequencies <= 28) )
+      gamma = numpy.nonzero( (spectralFrequencies >= 30) & (spectralFrequencies <= 34) )
+#print(theta)
+#print(theta[0])
 
 # <markdowncell>
 
@@ -371,9 +293,9 @@ print(theta[0])
 
 # <codecell>
 
-print(channelLabels)
-channelToAnalyse = 3 # index of the channels above to actually run regression analysis on
-print 'Analyzing:', channelLabels[channelToAnalyse]
+#print(channelLabels)
+#channelToAnalyse = 3 # index of the channels above to actually run regression analysis on
+#print 'Analyzing:', channelLabels[channelToAnalyse]
 
 # <markdowncell>
 
