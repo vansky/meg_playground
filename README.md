@@ -9,4 +9,13 @@ Once your file structure looks good, you'll need to go to the 'notebooks' subdir
 
     ipython notebook
 
-There are a number of dependencies, but the main one you'll need is ipython-notebook in the Debian repositories
+There are a number of dependencies:
+
+    ipython-notebook
+    numpy
+    scipy
+    matplotlib
+    pylab
+    scikit-learn
+    PyMVPA2 (from source [repos are out of date]: https://github.com/PyMVPA/PyMVPA)
+    
