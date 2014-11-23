@@ -25,17 +25,17 @@ import logging as L
 L.basicConfig(level=L.ERROR) # INFO)
 import time
 import numpy
-#import #pylab
 import scipy.stats
 import os
-import pylab
+#import pylab
 import sklearn
 import scipy
 import sklearn.linear_model
+import sys
 import re
 
-pylab.rcParams['figure.figsize'] = 10,10 #change the default image size for this session
-pylab.ion()
+#pylab.rcParams['figure.figsize'] = 10,10 #change the default image size for this session
+#pylab.ion()
 
 # <codecell>
 
@@ -68,17 +68,17 @@ import protoSpectralWinFFTMapper as specfft
 #### SUBROUTINES ####
 
 # plot the time-scale for ERFs and other epoch figures 
-def commonPlotProps():
+#def commonPlotProps():
         #zeroSample = (abs(epochStart)/float(epochLength)*epochNumTimepoints)
         #pylab.plot((0,epochNumTimepoints),(0,0),'k--')
         #pylab.ylim((-2.5e-13,2.5e-13)) #((-5e-14,5e-14)) # better way just to get the ones it choose itself?
         #pylab.plot((zeroSample,zeroSample),(0,0.01),'k--')
-        pylab.xticks(numpy.linspace(0,epochNumTimepoints,7),epochStart+(numpy.linspace(0,epochNumTimepoints,7)/samplingRate))
-        pylab.xlabel('time (s) relative to auditory onset') #+refEvent)
-        pylab.xlim((62,313))
-        pylab.show()
-        pylab.axhline(0, color='k', linestyle='--')
-        pylab.axvline(125, color='k', linestyle='--')
+#        pylab.xticks(numpy.linspace(0,epochNumTimepoints,7),epochStart+(numpy.linspace(0,epochNumTimepoints,7)/samplingRate))
+#        pylab.xlabel('time (s) relative to auditory onset') #+refEvent)
+#        pylab.xlim((62,313))
+#        pylab.show()
+#        pylab.axhline(0, color='k', linestyle='--')
+#        pylab.axvline(125, color='k', linestyle='--')
         
 # adjust R2 down for the artificial inflation you get by increasing the number of explanatory features
 def adjustR2(R2, numFeatures, numSamples):
@@ -108,7 +108,7 @@ def mynormalise(A):
 #%cd ../MEG_data
 
 #*# MARTY #*# choose a file - I found participant V to be pretty good, and 0.01 to 50Hz filter is pretty conservative #*#
-(megFileTag1, megFile1) = ('V_TSSS_0.01-50Hz_@125', '../MEG_data/v_hod_allRuns_tsss_audiobookPrepro_stPad1_lp50_resamp125_frac10ICAed_hp0.010000.set')
+(megFileTag1, megFile1) = ('V_TSSS_0.01-50Hz_@125', '../MEG_data/v_hod_allRuns_tsss_audiobookPrepro_stPad1_lp50_resamp125_frac10ICAed.set')#_hp0.010000.set')
 (megFileTag2, megFile2) = ('A_TSSS_0.01-50Hz_@125', '../MEG_data/aud_hofd_a_allRuns_tsss_audiobookPrepro_stPad1_lp50_resamp125_frac10ICAed_hp0.010000.set')
 (megFileTag3, megFile3) = ('C_TSSS_0.01-50Hz_@125', '../MEG_data/aud_hofd_c_allRuns_tsss_audiobookPrepro_stPad1_lp50_resamp125_frac10ICAed_hp0.010000.set')
 
@@ -185,10 +185,36 @@ testTrialsBool = numpy.array([s not in devitems for s in tokenProps['sentid']])
 inDataset = devTrialsBool
 freqsource = None # determines how the frequency bands are defined #Can be 'weiss', 'wiki', or an interpolation of the two 
 
+avefitresults = {}
+maxfitresults = {}
+for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last 'channel' is MISC
+  print 'Compiling data from channel:',channelix
+  #need to reshape because severalMagChannels needs to be channel x samples, and 1-D shapes are flattened by numpy
+  severalMagChannels1 = contSignalData1[channelix,:].reshape((1,-1))
 
-for channelix in range(metaData1.chanlocs):
-  severalMagChannels1 = contSignalData1[channelix,:]
+  ######
+  #####
+#  sys.stderr.write('metaData1.shape: '+str(metaData1.chanlocs.shape[0])+'\n')
+#  sys.stderr.write('contSignalData1.shape: '+str(contSignalData1.shape)+'\n')
+#  sys.stderr.write('severalMagChannels1.shape: '+str(severalMagChannels1.shape)+'\n')
+#  sys.stderr.write(str([metaData1.chanlocs[i].labels for i in range(len(metaData1.chanlocs))])+'\n')
+#  severalMagChannels1 = contSignalData1[channelix,:].reshape((1,-1))
+#  sys.stderr.write('contSignalData1.shape: '+str(contSignalData1.shape)+'\n')
+#  sys.stderr.write('severalMagChannels1.shape: '+str(severalMagChannels1.shape)+'\n')
+#  channelLabels = ['MEG0111', 'MEG0121', 'MEG0131', 'MEG0211', 'MEG0212', 'MEG0213', 'MEG0341']
+#  channelsOfInterest = [i for i in range(len(metaData1.chanlocs)) if metaData1.chanlocs[i].labels in channelLabels]
+#  severalMagChannels2 = contSignalData1[channelsOfInterest,:]
+#  sys.stderr.write('severalMagChannels2.shape: '+str(severalMagChannels2.shape)+'\n')
+#  severalMagChannels2 = contSignalData1[channelsOfInterest,:].reshape((1,-1))
+#  sys.stderr.write('severalMagChannels2.shape: '+str(severalMagChannels2.shape)+'\n')
+#  raise #need to determine whether we need to reshape with a center column or retain two dimensional...?
+  ######
+  ######
+
   (wordTrials1, epochedSignalData1, epochSliceTimepoints, wordTimesAbsolute, numTrials, epochNumTimepoints) = wordTrialEpochify(severalMagChannels1, samplingRate, tokenPropsOrig, trackTrials, refEvent, epochEnd, epochStart)
+
+#  sys.stderr.write('epochedSignalData1.shape: '+str(epochedSignalData1.shape)+'\n')
+
 
 # <codecell>
 #del contSignalData1
@@ -196,7 +222,7 @@ for channelix in range(metaData1.chanlocs):
 
 # <codecell>
 
-  severalMagChannels2 = contSignalData2[channelix,:]
+  severalMagChannels2 = contSignalData2[channelix,:].reshape((1,-1))
   (wordTrials2, epochedSignalData2, epochSliceTimepoints, wordTimesAbsolute, numTrials, epochNumTimepoints) = wordTrialEpochify(severalMagChannels2, samplingRate, tokenPropsOrig, trackTrials, refEvent, epochEnd, epochStart)
 
 # <codecell>
@@ -206,7 +232,7 @@ for channelix in range(metaData1.chanlocs):
 
 # <codecell>
 
-  severalMagChannels3 = contSignalData3[channelix,:]
+  severalMagChannels3 = contSignalData3[channelix,:].reshape((1,-1))
   (wordTrials3, epochedSignalData3, epochSliceTimepoints, wordTimesAbsolute, numTrials, epochNumTimepoints) = wordTrialEpochify(severalMagChannels3, samplingRate, tokenPropsOrig, trackTrials, refEvent, epochEnd, epochStart)
 
 # <codecell>
@@ -217,18 +243,17 @@ for channelix in range(metaData1.chanlocs):
 # <codecell>
 
   epochedSignalData = numpy.concatenate((epochedSignalData1,epochedSignalData2,epochedSignalData3), axis=0)
-  #print(epochedSignalData.shape)
+#  print(epochedSignalData.shape)
   #print(tokenProps.shape)
-  sys.stderr.write('epochedSignalData.shape: '+str(epochedSignalData.shape)+'\n')
-  raise #need to determine whether we need to reshape with a center column or retain two dimensional...?
-
+#  raise
+  
 # <codecell>
 
 #print tokenProps.shape,epochedSignalData.shape
   wordEpochs = epochedSignalData[wordTrialsBool & parsedTrialsBool & inDataset] #NB: Might not be 
   wordFeatures = tokenProps[wordTrialsBool & parsedTrialsBool & inDataset]
-#print wordFeatures.shape, wordEpochs.shape
-
+#  print wordFeatures.shape, wordEpochs.shape
+#  raise
 # <markdowncell>
 
 # Spectral decomposition
@@ -253,36 +278,38 @@ for channelix in range(metaData1.chanlocs):
 
 #print 'wordEpochs: ',wordEpochs.shape
 # Spectrally decompose the epochs
-  (mappedTrialFeatures, spectralFrequencies) = specfft.mapFeatures(wordEpochs,samplingRate,windowShape='hann',featureType='amp')
+  (mappedTrialFeatures, spectralFrequencies) = specfft.mapFeatures(wordEpochs,samplingRate,windowShape='hann',featureType='amp',freqRes=32)
 # Reshape output to get epochs x channels x frequency
   mappedTrialFeatures = mappedTrialFeatures.reshape((wordEpochs.shape[0],wordEpochs.shape[1],-1))
-#print 'FFT output: ', mappedTrialFeatures.shape, spectralFrequencies.shape
+#  print 'FFT output: ', mappedTrialFeatures.shape, spectralFrequencies.shape
+#  raise
+
 
 # <codecell>
 
 #print(spectralFrequencies)
-
+  freqbands = {}
   if freqsource == 'weiss':
       #Weiss et al. 05
-      theta = numpy.nonzero( (spectralFrequencies >= 4) & (spectralFrequencies <= 7) )
-      beta1 = numpy.nonzero( (spectralFrequencies >= 13) & (spectralFrequencies <= 18) )
-      beta2 = numpy.nonzero( (spectralFrequencies >= 20) & (spectralFrequencies <= 28) )
-      gamma = numpy.nonzero( (spectralFrequencies >= 30) & (spectralFrequencies <= 34) )
+      freqbands['theta'] = numpy.nonzero( (spectralFrequencies >= 4) & (spectralFrequencies <= 7) )
+      freqbands['beta1'] = numpy.nonzero( (spectralFrequencies >= 13) & (spectralFrequencies <= 18) )
+      freqbands['beta2'] = numpy.nonzero( (spectralFrequencies >= 20) & (spectralFrequencies <= 28) )
+      freqbands['gamma'] = numpy.nonzero( (spectralFrequencies >= 30) & (spectralFrequencies <= 34) )
   elif freqsource == 'wiki':
       # end of http://en.wikipedia.org/wiki/Theta_rhythm
-      delta = numpy.nonzero( (spectralFrequencies >= 0.1) & (spectralFrequencies <= 3) )
-      theta = numpy.nonzero( (spectralFrequencies >= 4) & (spectralFrequencies <= 7) )
-      alpha = numpy.nonzero( (spectralFrequencies >= 8) & (spectralFrequencies <= 15) )
-      beta = numpy.nonzero( (spectralFrequencies >= 16) & (spectralFrequencies <= 31) )
-      gamma = numpy.nonzero( (spectralFrequencies >= 32) & (spectralFrequencies <= 100) )
+      freqbands['delta'] = numpy.nonzero( (spectralFrequencies >= 0.1) & (spectralFrequencies <= 3) )
+      freqbands['theta'] = numpy.nonzero( (spectralFrequencies >= 4) & (spectralFrequencies <= 7) )
+      freqbands['alpha'] = numpy.nonzero( (spectralFrequencies >= 8) & (spectralFrequencies <= 15) )
+      freqbands['beta'] = numpy.nonzero( (spectralFrequencies >= 16) & (spectralFrequencies <= 31) )
+      freqbands['gamma'] = numpy.nonzero( (spectralFrequencies >= 32) & (spectralFrequencies <= 100) )
   else:
       #Interpolate between weiss and wiki
       #print(numpy.nonzero((spectralFrequencies >= 4) & (spectralFrequencies <= 7)))
-      theta = numpy.nonzero( (spectralFrequencies >= 4) & (spectralFrequencies <= 7) )
-      alpha = numpy.nonzero( (spectralFrequencies >= 8) & (spectralFrequencies < 13) )
-      beta1 = numpy.nonzero( (spectralFrequencies >= 13) & (spectralFrequencies <= 18) )
-      beta2 = numpy.nonzero( (spectralFrequencies >= 20) & (spectralFrequencies <= 28) )
-      gamma = numpy.nonzero( (spectralFrequencies >= 30) & (spectralFrequencies <= 34) )
+      freqbands['theta'] = numpy.nonzero( (spectralFrequencies >= 4) & (spectralFrequencies <= 7) )
+      freqbands['alpha'] = numpy.nonzero( (spectralFrequencies >= 8) & (spectralFrequencies < 13) )
+      freqbands['beta1'] = numpy.nonzero( (spectralFrequencies >= 13) & (spectralFrequencies <= 18) )
+      freqbands['beta2'] = numpy.nonzero( (spectralFrequencies >= 20) & (spectralFrequencies <= 28) )
+      freqbands['gamma'] = numpy.nonzero( (spectralFrequencies >= 30) & (spectralFrequencies <= 34) )
 #print(theta)
 #print(theta[0])
 
@@ -305,47 +332,43 @@ for channelix in range(metaData1.chanlocs):
 # <codecell>
 
 # REGULARISATION VALUES TO TRY (e.g. in Ridge GCV)
-regParam = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 1e+2, 2e+2, 5e+2, 1e+3, 2e+3, 5e+3]
+  regParam = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 1e+2, 2e+2, 5e+2, 1e+3, 2e+3, 5e+3]
 
 # SELECT AND DESCRIBE THE REGRESSORS WE'RE CHOOSING TO USE
 # this strings should match the names of the fields in tokenProps
 #*# MARTY #*# here you should list the features you're choosing from your .tab file (just one?) #*#
-features = [
- #'logFreq_ANC',
- #'surprisal2back_COCA',
- #'bigramEntropy_COCA_here',
- 'syndepth'
-]
-#*# MARTY #*# ... this has shorthand versions of the variable names, for display, and also has to include the "position" one that this version of the script inserts by default #*#
-labelMap = {
- #'logFreq_ANC': 'freq',
- #'surprisal2back_COCA': 'surprisal',
- #'bigramEntropy_COCA_here': 'entropy',
- #'sentenceSerial': 'position',
- 'syndepth': 'depth'
-}
-legendLabels = features
-
-# <codecell>
-
-# SLOT REGRESSORS IN ONE BY ONE
-explanatoryFeatures = numpy.zeros((wordFeatures.shape)) # dummy
-#explanatoryFeatures = numpy.array([])
-for feature in features:
-        print feature
-        explanatoryFeatures = numpy.vstack((explanatoryFeatures, wordFeatures[feature]))
-explanatoryFeatures = explanatoryFeatures[1:].T # strip zeros out again
+  features = [
+   #'logFreq_ANC',
+   #'surprisal2back_COCA',
+   #'bigramEntropy_COCA_here',
+   'syndepth'
+  ]
+  #*# MARTY #*# ... this has shorthand versions of the variable names, for display, and also has to include the "position" one that this version of the script inserts by default #*#
+  labelMap = {
+   #'logFreq_ANC': 'freq',
+   #'surprisal2back_COCA': 'surprisal',
+   #'bigramEntropy_COCA_here': 'entropy',
+   #'sentenceSerial': 'position',
+   'syndepth': 'depth'
+  }
+  legendLabels = features
+  
+  # <codecell>
+  
+  # SLOT REGRESSORS IN ONE BY ONE
+  explanatoryFeatures = numpy.zeros((wordFeatures.shape)) # dummy
+  #explanatoryFeatures = numpy.array([])
+  for feature in features:
+  #        print feature
+          explanatoryFeatures = numpy.vstack((explanatoryFeatures, wordFeatures[feature]))
+  explanatoryFeatures = explanatoryFeatures[1:].T # strip zeros out again
 
 # PLOT EFFECTS X EPOCHS BACK
 #*# MARTY #*# I guess you don't want to do the history thing (though is good initially for sanity check), so can leave this at 0 #*#
-epochHistory = 0
-
-# <codecell>
-
-modelTrainingFit = []
-modelTestCorrelation = []
-modelParameters = []
-legendLabels = features
+  epochHistory = 0
+  
+  # <codecell>
+  
 #tmpFeatures = explanatoryFeatures.copy()
 #tmpLegend = legendLabels[:]
 #for epochsBack in range(1,epochHistory+1):
@@ -362,10 +385,15 @@ legendLabels = features
 # <codecell>
 
 # STEP THROUGH EACH TIME POINT IN THE EPOCH, RUNNING REGRESSION FOR EACH ONE
-for t in theta[0]:#range(1):
-        #print 'fitting at timepoint',t
-        # NOTES # tried a load of different versions, and straight linear regression does as well as any of them, measured in terms of R^2
-
+  bandavefits = {}
+  bandmaxfits = {}
+  for band in freqbands:
+      modelTrainingFit = []
+      modelTestCorrelation = []
+      modelParameters = []
+      legendLabels = features
+    
+      for freq in freqbands[band]:
         # WHICH VARIETY OF REGRESSION TO USE?
         #*# MARTY #*# I get pretty similar results with all three of those below. The most generic (ie fewest extra assumptions) is normal LinearRegression. I guess RidgeCV should do best in terms of R^2, but has discontinuities in betas, as different regularisation parameters are optimal at each time step. LassoLars is something of a compromise. #*#
         #lm = sklearn.linear_model.LinearRegression(fit_intercept=True, normalize=True)
@@ -375,7 +403,7 @@ for t in theta[0]:#range(1):
         # NORMALISE THE EXPLANATORY VARIABLES? (for comparable beta magnitude interpretation)
         #*# MARTY #*# choose whether to scale inputs #*#
         trainX = mynormalise(explanatoryFeatures)
-        trainY = mynormalise(mappedTrialFeatures[:,channelToAnalyse,t])
+        trainY = mynormalise(mappedTrialFeatures[:,0,freq])
         #trainX = mynormalise(explanatoryFeatures)
         #trainY = mynormalise(wordEpochs[:,channelToAnalyse,t])
         #trainX = explanatoryFeatures
@@ -386,14 +414,21 @@ for t in theta[0]:#range(1):
         #print(lm.score(trainX,trainY),trainX.shape[1], trainX.shape[0])
         #modelTrainingFit.append(adjustR2(lm.score(trainX,trainY), trainX.shape[1], trainX.shape[0]))
         modelTrainingFit.append(lm.score(trainX,trainY)) #for a single feature, no punishment is necessary
+      bandavefits[band] = numpy.mean(modelTrainingFit)
+      bandmaxfits[band] = numpy.max(modelTrainingFit)
 
-# <codecell>
+  avefitresults[ metaData1.chanlocs[channelix].labels ] = bandavefits
+  maxfitresults[ metaData1.chanlocs[channelix].labels ] = bandmaxfits
 
-print(modelTrainingFit)
-print(numpy.sort(modelTrainingFit)[::-1])
-print 'ave fit: ', numpy.mean(modelTrainingFit)
-print 'max fit: ', numpy.max(modelTrainingFit)
 
+#print(modelTrainingFit)
+#print(numpy.sort(modelTrainingFit)[::-1])
+#print 'ave fit: ', numpy.mean(modelTrainingFit)
+#print 'max fit: ', numpy.max(modelTrainingFit)
+
+fitresults = {'ave':avefitresults,'max':maxfitresults}
+cPickle.dump(fitresults, open('fitresults.cpk', 'wb'))
+  
 # <markdowncell>
 
 # Graph results
@@ -402,57 +437,57 @@ print 'max fit: ', numpy.max(modelTrainingFit)
 # <codecell>
 
 # DETERMINE IF THERE IS CORRELATION BETWEEN THE EXPLANATORY VARIABLES
-betaMatrix = numpy.array([p.coef_ for p in modelParameters])
-print(betaMatrix.shape)
-neatLabels = [l.replace(re.match(r'[^-]+',l).group(0), labelMap[re.match(r'[^-]+',l).group(0)]) for l in legendLabels if re.match(r'[^-]+',l).group(0) in labelMap]
-legendLabels = numpy.array(legendLabels)
-#numFeaturesDisplay = len(legendLabels)
-neatLabels = numpy.array(neatLabels)
-
-# <codecell>
-
-# DO BIG SUMMARY PLOT OF FEATURE CORRELATIONS, R^2 OVER TIMECOURSE, BETAS OVER TIME COURSE, AND ERF/ERP
-f = pylab.figure(figsize=(10,10))
-s = pylab.subplot(2,2,1)
-pylab.title('R-squared '+str(trainedLM))
-pylab.plot(modelTrainingFit, linewidth=2)
-commonPlotProps()
-s = pylab.subplot(2,2,2)
-if betaMatrix.shape[1] > 7:
-        pylab.plot(betaMatrix[:,:7], '-', linewidth=2)
-        pylab.plot(betaMatrix[:,7:], '--', linewidth=2)
-else:
-        pylab.plot(betaMatrix, '-', linewidth=2)
-
-pylab.legend(neatLabels)
-#pylab.legend(legendLabels)
-pylab.title('betas for all (normed) variables')
-commonPlotProps()
-
-
-s = pylab.subplot(3,3,2)
-pylab.title('correlations between explanatory variables')
-pylab.imshow(numpy.abs(numpy.corrcoef(explanatoryFeatures.T)),interpolation='nearest', origin='upper') # leave out the dummy one
-pylab.clim(0,1)
-pylab.yticks(range(len(neatLabels)),neatLabels)
-pylab.ylim((-0.5,len(neatLabels)-0.5))
-pylab.xticks(range(len(neatLabels)),neatLabels, rotation=90)
-pylab.xlim((-0.5,len(neatLabels)-0.5))
-pylab.colorbar()
-
-#fontP = FontProperties()
-#fontP.set_size('small')
-#legend([s], "title", prop = fontP)
-
-#s = pylab.subplot(2,2,4)
-#pylab.plot(numpy.mean(epochedSignalData[wordTrialsBool,channelToAnalyse],axis=0).T, linewidth=2)
-#pylab.title('ERF')
+#betaMatrix = numpy.array([p.coef_ for p in modelParameters])
+#print(betaMatrix.shape)
+#neatLabels = [l.replace(re.match(r'[^-]+',l).group(0), labelMap[re.match(r'[^-]+',l).group(0)]) for l in legendLabels if re.match(r'[^-]+',l).group(0) in labelMap]
+#legendLabels = numpy.array(legendLabels)
+##numFeaturesDisplay = len(legendLabels)
+#neatLabels = numpy.array(neatLabels)
+#
+## <codecell>
+#
+## DO BIG SUMMARY PLOT OF FEATURE CORRELATIONS, R^2 OVER TIMECOURSE, BETAS OVER TIME COURSE, AND ERF/ERP
+#f = pylab.figure(figsize=(10,10))
+#s = pylab.subplot(2,2,1)
+#pylab.title('R-squared '+str(trainedLM))
+#pylab.plot(modelTrainingFit, linewidth=2)
 #commonPlotProps()
-
-#print 'history %d, mean model fit over -0.5s to +1.0s: %.5f, max is %.5f' % (epochHistory, numpy.mean(modelTrainingFit[62:250]), numpy.max(modelTrainingFit[62:250]))
-#pylab.savefig('meg_testfig_%s.png' % (channelLabels[channelToAnalyse]))
-
-pylab.show()
+#s = pylab.subplot(2,2,2)
+#if betaMatrix.shape[1] > 7:
+#        pylab.plot(betaMatrix[:,:7], '-', linewidth=2)
+#        pylab.plot(betaMatrix[:,7:], '--', linewidth=2)
+#else:
+#        pylab.plot(betaMatrix, '-', linewidth=2)
+#
+#pylab.legend(neatLabels)
+##pylab.legend(legendLabels)
+#pylab.title('betas for all (normed) variables')
+#commonPlotProps()
+#
+#
+#s = pylab.subplot(3,3,2)
+#pylab.title('correlations between explanatory variables')
+#pylab.imshow(numpy.abs(numpy.corrcoef(explanatoryFeatures.T)),interpolation='nearest', origin='upper') # leave out the dummy one
+#pylab.clim(0,1)
+#pylab.yticks(range(len(neatLabels)),neatLabels)
+#pylab.ylim((-0.5,len(neatLabels)-0.5))
+#pylab.xticks(range(len(neatLabels)),neatLabels, rotation=90)
+#pylab.xlim((-0.5,len(neatLabels)-0.5))
+#pylab.colorbar()
+#
+##fontP = FontProperties()
+##fontP.set_size('small')
+##legend([s], "title", prop = fontP)
+#
+##s = pylab.subplot(2,2,4)
+##pylab.plot(numpy.mean(epochedSignalData[wordTrialsBool,channelToAnalyse],axis=0).T, linewidth=2)
+##pylab.title('ERF')
+##commonPlotProps()
+#
+##print 'history %d, mean model fit over -0.5s to +1.0s: %.5f, max is %.5f' % (epochHistory, numpy.mean(modelTrainingFit[62:250]), numpy.max(modelTrainingFit[62:250]))
+##pylab.savefig('meg_testfig_%s.png' % (channelLabels[channelToAnalyse]))
+#
+#pylab.show()
 
 # <codecell>
 
