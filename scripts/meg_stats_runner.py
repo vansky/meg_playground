@@ -17,7 +17,8 @@
 # <codecell>
 
 #basic imports
-
+DEV = False
+BIGSCALE = False
 COMBINE_SUBJS = False
 
 #%pylab inline
@@ -32,10 +33,13 @@ import pandas as pd
 import os
 #import pylab
 import sklearn
+from sklearn import preprocessing
 import scipy
 import sklearn.linear_model
 import sys
 import re
+#import statsmodels.api as sm
+import statsmodels.formula.api as smf
 
 #pylab.rcParams['figure.figsize'] = 10,10 #change the default image size for this session
 #pylab.ion()
@@ -91,9 +95,16 @@ def adjustR2(R2, numFeatures, numSamples):
 
 # normalise (z-scale) the scale of variables (for the explanatory ones, so the magnitude of beta values are comparably interpretable)
 def mynormalise(A):
-        A = scipy.stats.zscore(A)
-        A[numpy.isnan(A)] = 0
-        return A
+  if BIGSCALE:
+      for cix in range(A.shape[1]):
+#        print numpy.mean(A[:,cix]), scipy.stats.sem(A[:,cix])
+        A[:,cix] = 10000000000*(A[:,cix] - numpy.mean(A[:,cix])) / scipy.stats.sem(A[:,cix])
+#        A[:,cix] = A[:,cix] - numpy.mean(A[:,cix])
+#        print 'Now:',numpy.mean(A[:,cix]), scipy.stats.sem(A[:,cix])
+  else:
+    A = scipy.stats.zscore(A)
+  A[numpy.isnan(A)] = 0
+  return A
 
 # <markdowncell>
 
@@ -186,13 +197,19 @@ devitems = numpy.arange(1,max(tokenProps['sentid']),devsizerecip)
 devTrialsBool = numpy.array([s in devitems for s in tokenProps['sentid']])
 testTrialsBool = numpy.array([s not in devitems for s in tokenProps['sentid']])
 
-inDataset = devTrialsBool
+if DEV:
+  inDataset = devTrialsBool
+else:
+  inDataset = testTrialsBool
 freqsource = None # determines how the frequency bands are defined #Can be 'weiss', 'wiki', or an interpolation of the two 
 
 fitresults = {}
-for i in range(NUMSUBJS):
-  fitresults[i] = {}
-avefitresults = {}
+#for i in range(NUMSUBJS):
+#  fitresults[i] = {}
+avefitsig_dict = {}
+avefit_dict = {}
+lm_dict = {}
+df_dict = {}
 #maxfitresults = {}
 for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last 'channel' is MISC
   print 'Compiling data from channel:',channelix
@@ -288,20 +305,22 @@ for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last
   # this strings should match the names of the fields in tokenProps
   #*# MARTY #*# here you should list the features you're choosing from your .tab file (just one?) #*#
     features = [
-     #'logFreq_ANC',
+     'logFreq_ANC',
      #'surprisal2back_COCA',
+     'bigramLogProbBack_COCA',
      #'bigramEntropy_COCA_here',
+     'sentenceSerial',
      'syndepth'
     ]
     #*# MARTY #*# ... this has shorthand versions of the variable names, for display, and also has to include the "position" one that this version of the script inserts by default #*#
-    labelMap = {
+ #   labelMap = {
      #'logFreq_ANC': 'freq',
      #'surprisal2back_COCA': 'surprisal',
      #'bigramEntropy_COCA_here': 'entropy',
      #'sentenceSerial': 'position',
-     'syndepth': 'depth'
-    }
-    legendLabels = features
+#     'syndepth': 'depth'
+#    }
+#    legendLabels = features
     
     # <codecell>
     
@@ -315,7 +334,7 @@ for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last
   
   # PLOT EFFECTS X EPOCHS BACK
   #*# MARTY #*# I guess you don't want to do the history thing (though is good initially for sanity check), so can leave this at 0 #*#
-    epochHistory = 0
+    #epochHistory = 0
     
     # <codecell>
     
@@ -335,7 +354,10 @@ for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last
   # <codecell>
   
   # STEP THROUGH EACH TIME POINT IN THE EPOCH, RUNNING REGRESSION FOR EACH ONE
-    bandavefits = {}
+    avefitsig = {}
+    avefit = {}
+    fitlm = {}
+    df_banddict = {}
     #bandmaxfits = {}
     for band in freqbands:
         modelTrainingFit = []
@@ -343,7 +365,14 @@ for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last
         modelParameters = []
         legendLabels = features
 
-        trainX = numpy.ravel(mynormalise(explanatoryFeatures))
+        trainX = pd.DataFrame(data = mynormalise(explanatoryFeatures), columns = features)
+        #trainX = pd.DataFrame(data = explanatoryFeatures, columns = features)
+#        for col in trainX.columns:
+#          print col, numpy.mean(trainX[col])
+#          trainX[col] = (trainX[col] - numpy.mean(trainX[col]))/scipy.stats.sem(trainX[col]) #preprocessing.scale(trainX[col])
+#          print col, numpy.mean(trainX[col])
+        #trainX = sm.add_constant(trainX) #add an intercept
+        
         freqsY = None
         for freq in freqbands[band]:
           # WHICH VARIETY OF REGRESSION TO USE?
@@ -356,30 +385,48 @@ for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last
           #*# MARTY #*# choose whether to scale inputs #*#
 
           if not freqsY:
-            freqsY = mynormalise(mappedTrialFeatures[:,0,freq])
+            freqsY = mappedTrialFeatures[:,0,freq]
           else:
-            freqsY = concatenate(freqsY,mynormalise(mappedTrialFeatures[:,0,freq]),axis=1)
+            freqsY = concatenate(freqsY,mappedTrialFeatures[:,0,freq],axis=1)
           #trainX = mynormalise(explanatoryFeatures)
           #trainY = mynormalise(wordEpochs[:,channelToAnalyse,t])
           #trainX = explanatoryFeatures
           #trainY = wordEpochs[:,channelToAnalyse,t]
 
-        trainY = numpy.mean(freqsY,axis=1)
-        #sys.stderr.write(str(freqsY.shape)+' '+str(trainY.shape)+' '+str(trainX.shape)+'\n')
-        #raise
-        df = pd.DataFrame({'Y':trainY,'X':trainX})
-        fitlm = pd.ols(y = df['Y'], x = df['X']) # intercept=True)
-        signif_of_fit = fitlm.f_stat['p-value']
+        #trainY = numpy.mean(freqsY,axis=1)
+        trainX['Y'] = numpy.mean(mynormalise(freqsY),axis=1)
+
+#        df = pd.DataFrame({'Y':trainY,'X':trainX})
+#        fitlm = pd.ols(y = df['Y'], x = df['X']) # intercept=True)
+
+        #lm = sm.OLS(trainY,trainX)
+        myform = 'Y ~ '+'+'.join(features)
+#        print myform, freqsY.shape, trainX.shape
+        lm = smf.ols(formula=myform,data=trainX,missing='drop')
+        bandlm = lm.fit_regularized(alpha=0.0001) #does a Lasso fit with same regularizer as above
+        signif_of_fit = bandlm.pvalues #stat['p-value']
+        goodness_of_fit = bandlm.rsquared_adj
         #trainedLM = lm.fit(trainX,trainY)
         #modelParameters.append(lm)
         #print(lm.score(trainX,trainY),trainX.shape[1], trainX.shape[0])
         #modelTrainingFit.append(adjustR2(lm.score(trainX,trainY), trainX.shape[1], trainX.shape[0]))
         #modelTrainingFit.append(lm.score(trainX,trainY)) #for a single feature, no punishment is necessary
-        bandavefits[band] = numpy.mean(signif_of_fit)
+        avefitsig[band] = signif_of_fit
+        avefit[band] = goodness_of_fit
+        #fitlm[band] = bandlm
+        #df_banddict[band] = trainX
+
+#        print bandlm.summary()
+#        print 'R2:',goodness_of_fit
+#        raise
         
         #bandmaxfits[band] = numpy.max(modelTrainingFit)
   
-    avefitresults[ metaData1.chanlocs[channelix].labels ] = bandavefits
+    avefitsig_dict[ metaData1.chanlocs[channelix].labels ] = avefitsig
+    avefit_dict[ metaData1.chanlocs[channelix].labels ] = avefit
+    lm_dict[ metaData1.chanlocs[channelix].labels ] = fitlm
+    df_dict[ metaData1.chanlocs[channelix].labels ] = df_banddict
+    
     #maxfitresults[ metaData1.chanlocs[channelix].labels ] = bandmaxfits
   
   
@@ -388,5 +435,14 @@ for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last
   #print 'ave fit: ', numpy.mean(modelTrainingFit)
   #print 'max fit: ', numpy.max(modelTrainingFit)
   
-fitresults = {'ave':avefitresults}
-cPickle.dump(fitresults, open('signifresults.cpk', 'wb'))
+fitresults = {'r2':avefit_dict,'p':avefitsig_dict,'lm':lm_dict,'df':df_dict}
+fname = 'signifresults.multifactor'
+if DEV:
+  fname = fname + '.dev'
+else:
+  fname = fname + '.test'
+if BIGSCALE:
+  fname = fname + '.bigscale'
+
+cPickle.dump(fitresults, open(fname+'.cpk', 'wb'))
+
