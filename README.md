@@ -11,6 +11,8 @@ There are a number of dependencies:
     matplotlib
     pylab
     scikit-learn
+    pandas
+    statsmodels
     PyMVPA2 (from source [repos are out of date]: https://github.com/PyMVPA/PyMVPA)
 
 You'll need to create a subdirectory named 'MEG_data' and store the relevant data files there for this code to work. Within MEG_data, you'll need:
@@ -26,3 +28,6 @@ If you want to run the notebook analyses over each individual channel (and multi
 
     python meg_frequency_scanner.py
     
+or you can get stats by going to the 'scripts' directory and typing  
+
+    python meg_stats_runner.py
