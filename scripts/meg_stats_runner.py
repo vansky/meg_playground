@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # <nbformat>3.0</nbformat>
+# This script extracts P-values and R^2 values over each frequency band and determines model fits
 
 # <markdowncell>
 
@@ -14,11 +15,10 @@
 # this means an autosave causing a crash will actually delete the file rather than saving it!!!
 #%autosave 0
 
-# <codecell>
 
 #basic imports
-DEV = False
-BIGSCALE = False
+DEV = True
+CLUSTER = False
 COMBINE_SUBJS = False
 
 #%pylab inline
@@ -95,14 +95,7 @@ def adjustR2(R2, numFeatures, numSamples):
 
 # normalise (z-scale) the scale of variables (for the explanatory ones, so the magnitude of beta values are comparably interpretable)
 def mynormalise(A):
-  if BIGSCALE:
-      for cix in range(A.shape[1]):
-#        print numpy.mean(A[:,cix]), scipy.stats.sem(A[:,cix])
-        A[:,cix] = 10000000000*(A[:,cix] - numpy.mean(A[:,cix])) / scipy.stats.sem(A[:,cix])
-#        A[:,cix] = A[:,cix] - numpy.mean(A[:,cix])
-#        print 'Now:',numpy.mean(A[:,cix]), scipy.stats.sem(A[:,cix])
-  else:
-    A = scipy.stats.zscore(A)
+  A = scipy.stats.zscore(A)
   A[numpy.isnan(A)] = 0
   return A
 
@@ -236,7 +229,7 @@ for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last
   #for i,epochedSignalData in enumerate(epochedSignalDataCore):
   
     #print tokenProps.shape,epochedSignalData.shape
-    sys.stderr.write(str(epochedSignalData.shape)+' '+str(parsedTrialsBool.shape) +' ' + str(inDataset.shape)+'\n')#& parsedTrialsBool & inDataset] #NB: Might not be 
+    sys.stderr.write(str(epochedSignalData.shape)+' '+str(parsedTrialsBool.shape) +' ' + str(inDataset.shape)+'\n')#& parsedTrialsBool & inDataset]
     wordEpochs = epochedSignalData[wordTrialsBool & parsedTrialsBool & inDataset] #NB: Might not be 
     wordFeatures = tokenProps[wordTrialsBool & parsedTrialsBool & inDataset]
   # The FFT script collapses across channels
@@ -310,6 +303,8 @@ for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last
      'bigramLogProbBack_COCA',
      #'bigramEntropy_COCA_here',
      'sentenceSerial',
+     'runSerial',
+     'storySerial',
      'syndepth'
     ]
     #*# MARTY #*# ... this has shorthand versions of the variable names, for display, and also has to include the "position" one that this version of the script inserts by default #*#
@@ -405,14 +400,15 @@ for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last
         lm = smf.ols(formula=myform,data=trainX,missing='drop')
         bandlm = lm.fit_regularized(alpha=0.0001) #does a Lasso fit with same regularizer as above
         signif_of_fit = bandlm.pvalues #stat['p-value']
-        goodness_of_fit = bandlm.rsquared_adj
+        goodness_of_fit0 = bandlm.rsquared
+        goodness_of_fit1 = bandlm.rsquared_adj
         #trainedLM = lm.fit(trainX,trainY)
         #modelParameters.append(lm)
         #print(lm.score(trainX,trainY),trainX.shape[1], trainX.shape[0])
         #modelTrainingFit.append(adjustR2(lm.score(trainX,trainY), trainX.shape[1], trainX.shape[0]))
         #modelTrainingFit.append(lm.score(trainX,trainY)) #for a single feature, no punishment is necessary
         avefitsig[band] = signif_of_fit
-        avefit[band] = goodness_of_fit
+        avefit[band] = (goodness_of_fit0,goodness_of_fit1)
         #fitlm[band] = bandlm
         #df_banddict[band] = trainX
 
@@ -441,8 +437,9 @@ if DEV:
   fname = fname + '.dev'
 else:
   fname = fname + '.test'
-if BIGSCALE:
-  fname = fname + '.bigscale'
+if CLUSTER:
+  fname = fname + '.cluster'
 
+  
 cPickle.dump(fitresults, open(fname+'.cpk', 'wb'))
 
