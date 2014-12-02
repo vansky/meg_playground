@@ -196,6 +196,18 @@ else:
   inDataset = testTrialsBool
 freqsource = None # determines how the frequency bands are defined #Can be 'weiss', 'wiki', or an interpolation of the two 
 
+xdivs = []
+ydivs = []
+if CLUSTER: #??!!NB: clustering goes here
+  clustershape = (3,2) #bottom 4 quadrants
+
+  #find xmax/min and ymax/min in first loop
+
+  #assign sensor labels to clusters in second loop
+  sensorLocations = {}
+  for sensor in metaData1.chanlocs:
+    sensorLocations[sensor.labels] = (-sensor.Y, sensor.X) 
+
 fitresults = {}
 #for i in range(NUMSUBJS):
 #  fitresults[i] = {}
@@ -269,7 +281,7 @@ for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last
         freqbands['alpha'] = numpy.nonzero( (spectralFrequencies >= 8) & (spectralFrequencies < 13) )
         freqbands['beta1'] = numpy.nonzero( (spectralFrequencies >= 13) & (spectralFrequencies <= 18) )
         freqbands['beta2'] = numpy.nonzero( (spectralFrequencies >= 20) & (spectralFrequencies <= 28) )
-        #freqbands['gamma'] = numpy.nonzero( (spectralFrequencies >= 30) & (spectralFrequencies <= 34) )
+        freqbands['gamma'] = numpy.nonzero( (spectralFrequencies >= 30) & (spectralFrequencies <= 34) )
   #print(theta)
   #print(theta[0])
   
