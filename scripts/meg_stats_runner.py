@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8; python-indent: 2; -*-
 # <nbformat>3.0</nbformat>
 # This script extracts P-values and R^2 values over each frequency band and determines model fits
 
@@ -18,7 +18,7 @@
 
 #basic imports
 DEV = True
-CLUSTER = False
+CLUSTER = True
 COMBINE_SUBJS = False
 
 #%pylab inline
@@ -114,7 +114,7 @@ def mynormalise(A):
 #change to the data directory to load in the data
 #%cd ../MEG_data
 
-#*# MARTY #*# choose a file - I found participant V to be pretty good, and 0.01 to 50Hz filter is pretty conservative #*#
+#choose a file - I found participant V to be pretty good, and 0.01 to 50Hz filter is pretty conservative #
 (megFileTag1, megFile1) = ('V_TSSS_0.01-50Hz_@125', '../MEG_data/v_hod_allRuns_tsss_audiobookPrepro_stPad1_lp50_resamp125_frac10ICAed.set')#_hp0.010000.set')
 (megFileTag2, megFile2) = ('A_TSSS_0.01-50Hz_@125', '../MEG_data/aud_hofd_a_allRuns_tsss_audiobookPrepro_stPad1_lp50_resamp125_frac10ICAed_hp0.010000.set')
 (megFileTag3, megFile3) = ('C_TSSS_0.01-50Hz_@125', '../MEG_data/aud_hofd_c_allRuns_tsss_audiobookPrepro_stPad1_lp50_resamp125_frac10ICAed_hp0.010000.set')
@@ -125,13 +125,8 @@ def mynormalise(A):
 #  python ../scripts/addsentid.py hod_JoeTimes_LoadsaFeaturesV4.tab > hod_JoeTimes_LoadsaFeaturesV5.tab
 tokenPropsFile = '../MEG_data/hod_JoeTimes_LoadsaFeaturesV5.tab'
 
-# WHICH CHANNELS TO LOOK AT AS ERFS
-#*# MARTY #*# decide which channels to use - channels of interest are the first few you can look at in an ERF, and then from them you can choose one at a time with "channelToAnalyse" for the actual regression analysis #*#
-#channelLabels = ['MEG0111', 'MEG0121', 'MEG0131', 'MEG0211', 'MEG0212', 'MEG0213', 'MEG0341']
-#?# this way of doing things was a slightly clumsy work-around, cos I didn't have enough memory to epoch all 306 channels at one time
-
 # LOAD WORD PROPS
-#*# MARTY #*# change dtype to suit the files in your .tab file #*#
+# change dtype to suit the files in your .tab file #
 tokenProps = scipy.genfromtxt(tokenPropsFile,
                               delimiter='\t',names=True,
                               dtype="i4,f4,f4,S50,S50,i2,i2,i2,S10,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,i1,>i4")
@@ -148,7 +143,7 @@ cPickle.dump(tokenProps, open(tokenPropsPickle, 'wb'))
 
 triggersOfInterest=['s%d' % i for i in range(1,10)]
 refEvent = 'onTime' #,'offTime']
-#*# MARTY #*# guess an epoch of -0.5 to +1s should be enough #*#
+# guess an epoch of -0.5 to +1s should be enough #
 epochStart = -1; # stimulus ref event
 epochEnd = +2; # 
 epochLength = epochEnd-epochStart;
@@ -196,26 +191,62 @@ else:
   inDataset = testTrialsBool
 freqsource = None # determines how the frequency bands are defined #Can be 'weiss', 'wiki', or an interpolation of the two 
 
-xdivs = []
-ydivs = []
 if CLUSTER: #??!!NB: clustering goes here
-  clustershape = (3,2) #bottom 4 quadrants
+  clustershape = (3,3) #bottom 6 sectors
+  xdivs = np.arange(clustershape[0])
+  ydivs = np.arange(clustershape[1])
 
   #find xmax/min and ymax/min in first loop
-
-  #assign sensor labels to clusters in second loop
-  sensorLocations = {}
+  minx = None
+  maxx = None
+  miny = None
+  maxy = None
   for sensor in metaData1.chanlocs:
-    sensorLocations[sensor.labels] = (-sensor.Y, sensor.X) 
+    #need to remap what X and Y are from the EEGLab defaults
+    thisx = -sensor.Y
+    thisy = sensor.X
+    if not minx or thisx < minx:
+      minx = thisx
+    if not maxx or thisx > maxx:
+      maxx = thisx
+    if not miny or thisy < miny:
+      miny = thisy
+    if not maxy or thisy > maxy:
+      maxy = thisy
+
+  xdivs *= (xmax+xmin)/float(clustershape[0])
+  ydivs *= (ymax+ymin)/float(clustershape[1])
+  #assign sensor labels to clusters in second loop
+  sensorCluster = {}
+  for sensorix,sensor in enumerate(metaData1.chanlocs):
+    thisx = -sensor.Y
+    thisy = sensor.X
+    xpos = 0
+    ypos = 0
+    for i,x in enumerate(xdivs[1:]):
+      #find the xdim of the cluster
+      if thisx <= x:
+        xpos = i
+        break
+    for i,y in enumerate(ydivs[1:]):
+      #find the ydim of the cluster
+      if thisy <= y:
+        ypos = i
+        break
+    sensorCluster[sensorix] = (xpos, ypos) 
 
 fitresults = {}
 #for i in range(NUMSUBJS):
 #  fitresults[i] = {}
 avefitsig_dict = {}
 avefit_dict = {}
-lm_dict = {}
-df_dict = {}
+#lm_dict = {}
+#df_dict = {}
 #maxfitresults = {}
+freqsY = None
+trainX = None
+clusterpower = {}
+clustersize = {}
 for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last 'channel' is MISC
   print 'Compiling data from channel:',channelix
   #need to reshape because severalMagChannels needs to be channel x samples, and 1-D shapes are flattened by numpy
@@ -242,7 +273,7 @@ for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last
   
     #print tokenProps.shape,epochedSignalData.shape
     sys.stderr.write(str(epochedSignalData.shape)+' '+str(parsedTrialsBool.shape) +' ' + str(inDataset.shape)+'\n')#& parsedTrialsBool & inDataset]
-    wordEpochs = epochedSignalData[wordTrialsBool & parsedTrialsBool & inDataset] #NB: Might not be 
+    wordEpochs = epochedSignalData[wordTrialsBool & parsedTrialsBool & inDataset]
     wordFeatures = tokenProps[wordTrialsBool & parsedTrialsBool & inDataset]
   # The FFT script collapses across channels
   # index0: epoch
@@ -282,33 +313,13 @@ for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last
         freqbands['beta1'] = numpy.nonzero( (spectralFrequencies >= 13) & (spectralFrequencies <= 18) )
         freqbands['beta2'] = numpy.nonzero( (spectralFrequencies >= 20) & (spectralFrequencies <= 28) )
         freqbands['gamma'] = numpy.nonzero( (spectralFrequencies >= 30) & (spectralFrequencies <= 34) )
-  #print(theta)
-  #print(theta[0])
-  
-  # <markdowncell>
-  
-  # Select channel for analysis
-  # --------------
-  
-  # <codecell>
-  
-  #print(channelLabels)
-  #channelToAnalyse = 3 # index of the channels above to actually run regression analysis on
-  #print 'Analyzing:', channelLabels[channelToAnalyse]
-  
-  # <markdowncell>
-  
-  # Run Regression Analysis
-  # ---------------------------
-  
-  # <codecell>
-  
-  # REGULARISATION VALUES TO TRY (e.g. in Ridge GCV)
+
+    # REGULARISATION VALUES TO TRY (e.g. in Ridge GCV)
     regParam = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 1e+2, 2e+2, 5e+2, 1e+3, 2e+3, 5e+3]
   
   # SELECT AND DESCRIBE THE REGRESSORS WE'RE CHOOSING TO USE
   # this strings should match the names of the fields in tokenProps
-  #*# MARTY #*# here you should list the features you're choosing from your .tab file (just one?) #*#
+  # here you should list the features you're choosing from your .tab file (just one?)#
     features = [
      'logFreq_ANC',
      #'surprisal2back_COCA',
@@ -319,53 +330,49 @@ for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last
      'storySerial',
      'syndepth'
     ]
-    #*# MARTY #*# ... this has shorthand versions of the variable names, for display, and also has to include the "position" one that this version of the script inserts by default #*#
- #   labelMap = {
-     #'logFreq_ANC': 'freq',
-     #'surprisal2back_COCA': 'surprisal',
-     #'bigramEntropy_COCA_here': 'entropy',
-     #'sentenceSerial': 'position',
-#     'syndepth': 'depth'
-#    }
-#    legendLabels = features
-    
-    # <codecell>
-    
+
     # SLOT REGRESSORS IN ONE BY ONE
     explanatoryFeatures = numpy.zeros((wordFeatures.shape)) # dummy
     #explanatoryFeatures = numpy.array([])
     for feature in features:
-    #        print feature
-            explanatoryFeatures = numpy.vstack((explanatoryFeatures, wordFeatures[feature]))
+      explanatoryFeatures = numpy.vstack((explanatoryFeatures, wordFeatures[feature]))
     explanatoryFeatures = explanatoryFeatures[1:].T # strip zeros out again
-  
-  # PLOT EFFECTS X EPOCHS BACK
-  #*# MARTY #*# I guess you don't want to do the history thing (though is good initially for sanity check), so can leave this at 0 #*#
-    #epochHistory = 0
-    
-    # <codecell>
-    
-  #tmpFeatures = explanatoryFeatures.copy()
-  #tmpLegend = legendLabels[:]
-  #for epochsBack in range(1,epochHistory+1):
-  #        epochFeatures = numpy.zeros(tmpFeatures.shape)
-  #        epochFeatures[epochsBack:,:] = tmpFeatures[:-epochsBack,:]
-  #        explanatoryFeatures = numpy.hstack((explanatoryFeatures,epochFeatures))
-  #        legendLabels = legendLabels + [l+'-'+str(epochsBack) for l in tmpLegend]
-  
-  ## put in sentence serial - can't leave in history, cos is too highly correlated across history...
-  #explanatoryFeatures = numpy.vstack((explanatoryFeatures.T, wordFeatures['sentenceSerial'])).T
-  #features.append('sentenceSerial')
-  #legendLabels.append('sentenceSerial')
-  
-  # <codecell>
   
   # STEP THROUGH EACH TIME POINT IN THE EPOCH, RUNNING REGRESSION FOR EACH ONE
     avefitsig = {}
     avefit = {}
-    fitlm = {}
-    df_banddict = {}
+    #fitlm = {}
+    #df_banddict = {}
     #bandmaxfits = {}
+
+    if CLUSTER:
+      #accumulate the cluster data before running the analysis
+      # This is impractical because we can't hold all the data in memory at once...
+#      for freq in mappedTrialFeatures[0,0,:]:
+#        if not freqsY:
+#          freqsY = mappedTrialFeatures[:,0,freq]
+#        else:
+#          freqsY = concatenate(freqsY,mappedTrialFeatures[:,0,freq],axis=1)
+      clusterid = sensorCluster[channelix]
+      if clusterid not in clusterpower:
+        clusterpower[clusterid] = {}
+        clustersize[clusterid] = 0
+      clustersize[clusterid] += 1
+      for band in freqbands:
+        for freq in freqbands[band]:
+          if not freqsY:                                                     
+            freqsY = mappedTrialFeatures[:,0,freq]                           
+          else:                                                              
+            freqsY = concatenate(freqsY,mappedTrialFeatures[:,0,freq],axis=1)
+        if band not in clusterpower[clusterid]:
+          clusterpower[clusterid][band] = numpy.mean(mynormalise(freqsY),axis=1).reshape(-1,1)
+        else:
+          clusterpower[clusterid][band] = concatenate(clusterpower[clusterid][band],numpy.mean(mynormalise(freqsY),axis=1).reshape(-1,1))
+
+        if not trainX:
+          trainX = pd.DataFrame(data = mynormalise(explanatoryFeatures), columns = features)
+      continue #don't run the analysis yet because we haven't accumulated over the whole cluster
+      
     for band in freqbands:
         modelTrainingFit = []
         modelTestCorrelation = []
@@ -373,34 +380,21 @@ for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last
         legendLabels = features
 
         trainX = pd.DataFrame(data = mynormalise(explanatoryFeatures), columns = features)
-        #trainX = pd.DataFrame(data = explanatoryFeatures, columns = features)
-#        for col in trainX.columns:
-#          print col, numpy.mean(trainX[col])
-#          trainX[col] = (trainX[col] - numpy.mean(trainX[col]))/scipy.stats.sem(trainX[col]) #preprocessing.scale(trainX[col])
-#          print col, numpy.mean(trainX[col])
-        #trainX = sm.add_constant(trainX) #add an intercept
         
         freqsY = None
         for freq in freqbands[band]:
           # WHICH VARIETY OF REGRESSION TO USE?
-          #*# MARTY #*# I get pretty similar results with all three of those below. The most generic (ie fewest extra assumptions) is normal LinearRegression. I guess RidgeCV should do best in terms of R^2, but has discontinuities in betas, as different regularisation parameters are optimal at each time step. LassoLars is something of a compromise. #*#
+          # I get pretty similar results with all three of those below. The most generic (ie fewest extra assumptions) is normal LinearRegression. I guess RidgeCV should do best in terms of R^2, but has discontinuities in betas, as different regularisation parameters are optimal at each time step. LassoLars is something of a compromise. #
           #lm = sklearn.linear_model.LinearRegression(fit_intercept=True, normalize=True)
           #lm = sklearn.linear_model.RidgeCV(fit_intercept=True, normalize=True, alphas=regParam) #, 10000, 100000])
           #lm = sklearn.linear_model.LassoLars(alpha=0.0001) #(alpha=1.0, fit_intercept=True, verbose=False, normalize=True, precompute='auto', max_iter=500, eps=2.2204460492503131e-16, copy_X=True)
   
-          # NORMALISE THE EXPLANATORY VARIABLES? (for comparable beta magnitude interpretation)
-          #*# MARTY #*# choose whether to scale inputs #*#
-
+          # NORMALISE THE EXPLANATORY VARIABLES (for comparable beta magnitude interpretation)
           if not freqsY:
             freqsY = mappedTrialFeatures[:,0,freq]
           else:
             freqsY = concatenate(freqsY,mappedTrialFeatures[:,0,freq],axis=1)
-          #trainX = mynormalise(explanatoryFeatures)
-          #trainY = mynormalise(wordEpochs[:,channelToAnalyse,t])
-          #trainX = explanatoryFeatures
-          #trainY = wordEpochs[:,channelToAnalyse,t]
 
-        #trainY = numpy.mean(freqsY,axis=1)
         trainX['Y'] = numpy.mean(mynormalise(freqsY),axis=1)
 
 #        df = pd.DataFrame({'Y':trainY,'X':trainX})
@@ -432,8 +426,8 @@ for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last
   
     avefitsig_dict[ metaData1.chanlocs[channelix].labels ] = avefitsig
     avefit_dict[ metaData1.chanlocs[channelix].labels ] = avefit
-    lm_dict[ metaData1.chanlocs[channelix].labels ] = fitlm
-    df_dict[ metaData1.chanlocs[channelix].labels ] = df_banddict
+#    lm_dict[ metaData1.chanlocs[channelix].labels ] = fitlm
+#    df_dict[ metaData1.chanlocs[channelix].labels ] = df_banddict
     
     #maxfitresults[ metaData1.chanlocs[channelix].labels ] = bandmaxfits
   
@@ -442,8 +436,26 @@ for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last
   #print(numpy.sort(modelTrainingFit)[::-1])
   #print 'ave fit: ', numpy.mean(modelTrainingFit)
   #print 'max fit: ', numpy.max(modelTrainingFit)
+if CLUSTER:
+  #now we've got all the clusters, so analyze them
+  myform = 'Y ~ '+'+'.join(list(trainX.columns))
+  for clusterid in clusterpower:
+    avefit = {}
+    avefitsig = {}
+    for band in clusterpower[clusterid]:
+      trainX['Y'] = numpy.mean(mynormalise(clusterpower[clusterid][band]),axis=1)
+      lm = smf.ols(formula=myform,data=trainX,missing='drop')
+      bandlm = lm.fit_regularized(alpha=0.0001) #does a Lasso fit with same regularizer as above
+      signif_of_fit = bandlm.pvalues #stat['p-value']
+      goodness_of_fit0 = bandlm.rsquared
+      goodness_of_fit1 = bandlm.rsquared_adj
+      avefitsig[band] = signif_of_fit
+      avefit[band] = (goodness_of_fit0,goodness_of_fit1)
+    avefitsig_dict[ clusterid ] = avefitsig
+    avefit_dict[ clusterid ] = avefit
+    
   
-fitresults = {'r2':avefit_dict,'p':avefitsig_dict,'lm':lm_dict,'df':df_dict}
+fitresults = {'r2':avefit_dict,'p':avefitsig_dict} #,'lm':lm_dict,'df':df_dict}
 fname = 'signifresults.multifactor'
 if DEV:
   fname = fname + '.dev'
