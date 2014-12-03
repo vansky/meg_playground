@@ -20,6 +20,7 @@
 DEV = True
 CLUSTER = True
 COMBINE_SUBJS = False
+SHORTTEST = False #for debugging purposes
 
 #%pylab inline
 import time
@@ -193,8 +194,8 @@ freqsource = None # determines how the frequency bands are defined #Can be 'weis
 
 if CLUSTER: #??!!NB: clustering goes here
   clustershape = (3,3) #bottom 6 sectors
-  xdivs = np.arange(clustershape[0])
-  ydivs = np.arange(clustershape[1])
+  xdivs = numpy.arange(float(clustershape[0])+1)
+  ydivs = numpy.arange(float(clustershape[1])+1)
 
   #find xmax/min and ymax/min in first loop
   minx = None
@@ -214,8 +215,13 @@ if CLUSTER: #??!!NB: clustering goes here
     if not maxy or thisy > maxy:
       maxy = thisy
 
-  xdivs *= (xmax+xmin)/float(clustershape[0])
-  ydivs *= (ymax+ymin)/float(clustershape[1])
+  #print minx, maxx, miny, maxy
+  #sys.stderr.write('x: '+str(xdivs)+' y: '+str(ydivs)+'\n')
+  xdivs *= float(maxx-minx)/float(clustershape[0])
+  xdivs += minx
+  ydivs *= float(maxy-miny)/float(clustershape[1])
+  ydivs += miny
+  #sys.stderr.write('x: '+str(xdivs)+' y: '+str(ydivs)+'\n')
   #assign sensor labels to clusters in second loop
   sensorCluster = {}
   for sensorix,sensor in enumerate(metaData1.chanlocs):
@@ -235,6 +241,8 @@ if CLUSTER: #??!!NB: clustering goes here
         break
     sensorCluster[sensorix] = (xpos, ypos) 
 
+if CLUSTER:
+  print 'Cluster IDs: ', str(set(sensorCluster.values()))
 fitresults = {}
 #for i in range(NUMSUBJS):
 #  fitresults[i] = {}
@@ -247,7 +255,12 @@ freqsY = None
 trainX = None
 clusterpower = {}
 clustersize = {}
-for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last 'channel' is MISC
+FIRSTCLUSTER = True
+if SHORTTEST:
+  chanixes = range(2)+range(metaData1.chanlocs.shape[0]-2,metaData1.chanlocs.shape[0]-4,-1)
+else:
+  chanixes = range(metaData1.chanlocs.shape[0]-1) #minus 1 because the last 'channel' is MISC
+for channelix in chanixes: 
   print 'Compiling data from channel:',channelix
   #need to reshape because severalMagChannels needs to be channel x samples, and 1-D shapes are flattened by numpy
   severalMagChannels1 = contSignalData1[channelix,:].reshape((1,-1))
@@ -272,7 +285,7 @@ for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last
   #for i,epochedSignalData in enumerate(epochedSignalDataCore):
   
     #print tokenProps.shape,epochedSignalData.shape
-    sys.stderr.write(str(epochedSignalData.shape)+' '+str(parsedTrialsBool.shape) +' ' + str(inDataset.shape)+'\n')#& parsedTrialsBool & inDataset]
+    #sys.stderr.write(str(epochedSignalData.shape)+' '+str(parsedTrialsBool.shape) +' ' + str(inDataset.shape)+'\n')#& parsedTrialsBool & inDataset]
     wordEpochs = epochedSignalData[wordTrialsBool & parsedTrialsBool & inDataset]
     wordFeatures = tokenProps[wordTrialsBool & parsedTrialsBool & inDataset]
   # The FFT script collapses across channels
@@ -352,25 +365,26 @@ for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last
 #        if not freqsY:
 #          freqsY = mappedTrialFeatures[:,0,freq]
 #        else:
-#          freqsY = concatenate(freqsY,mappedTrialFeatures[:,0,freq],axis=1)
+#          freqsY = concatenate((freqsY,mappedTrialFeatures[:,0,freq]),axis=1)
       clusterid = sensorCluster[channelix]
       if clusterid not in clusterpower:
         clusterpower[clusterid] = {}
         clustersize[clusterid] = 0
       clustersize[clusterid] += 1
       for band in freqbands:
-        for freq in freqbands[band]:
-          if not freqsY:                                                     
-            freqsY = mappedTrialFeatures[:,0,freq]                           
-          else:                                                              
-            freqsY = concatenate(freqsY,mappedTrialFeatures[:,0,freq],axis=1)
+        for ix,freq in enumerate(freqbands[band]):
+          if ix == 0:
+            freqsY = mappedTrialFeatures[:,0,freq]
+          else:
+            freqsY = numpy.concatenate((freqsY,mappedTrialFeatures[:,0,freq]),axis=1)
         if band not in clusterpower[clusterid]:
           clusterpower[clusterid][band] = numpy.mean(mynormalise(freqsY),axis=1).reshape(-1,1)
         else:
-          clusterpower[clusterid][band] = concatenate(clusterpower[clusterid][band],numpy.mean(mynormalise(freqsY),axis=1).reshape(-1,1))
+          clusterpower[clusterid][band] = numpy.concatenate((clusterpower[clusterid][band],numpy.mean(mynormalise(freqsY),axis=1).reshape(-1,1)),axis=1)
 
-        if not trainX:
-          trainX = pd.DataFrame(data = mynormalise(explanatoryFeatures), columns = features)
+      if FIRSTCLUSTER:
+        trainX = pd.DataFrame(data = mynormalise(explanatoryFeatures), columns = features)
+        FIRSTCLUSTER = False
       continue #don't run the analysis yet because we haven't accumulated over the whole cluster
       
     for band in freqbands:
@@ -393,7 +407,7 @@ for channelix in range(metaData1.chanlocs.shape[0]-1): #minus 1 because the last
           if not freqsY:
             freqsY = mappedTrialFeatures[:,0,freq]
           else:
-            freqsY = concatenate(freqsY,mappedTrialFeatures[:,0,freq],axis=1)
+            freqsY = numpy.concatenate(freqsY,mappedTrialFeatures[:,0,freq],axis=1)
 
         trainX['Y'] = numpy.mean(mynormalise(freqsY),axis=1)
 
@@ -456,6 +470,8 @@ if CLUSTER:
     
   
 fitresults = {'r2':avefit_dict,'p':avefitsig_dict} #,'lm':lm_dict,'df':df_dict}
+if CLUSTER:
+  fitresults.update({'clustersize':clustersize})
 fname = 'signifresults.multifactor'
 if DEV:
   fname = fname + '.dev'
