@@ -17,10 +17,11 @@
 
 
 #basic imports
-DEV = True
-CLUSTER = True
+DEV = False
+CLUSTER = False
 COMBINE_SUBJS = False
-SHORTTEST = False #for debugging purposes
+SHORTTEST = True #for debugging purposes
+VERBOSE = False
 
 #%pylab inline
 import time
@@ -192,7 +193,7 @@ else:
   inDataset = testTrialsBool
 freqsource = None # determines how the frequency bands are defined #Can be 'weiss', 'wiki', or an interpolation of the two 
 
-if CLUSTER: #??!!NB: clustering goes here
+if CLUSTER: 
   clustershape = (3,3) #bottom 6 sectors
   xdivs = numpy.arange(float(clustershape[0])+1)
   ydivs = numpy.arange(float(clustershape[1])+1)
@@ -257,9 +258,12 @@ clusterpower = {}
 clustersize = {}
 FIRSTCLUSTER = True
 if SHORTTEST:
-  chanixes = range(2)+range(metaData1.chanlocs.shape[0]-2,metaData1.chanlocs.shape[0]-4,-1)
+  #chanixes = range(2)+range(metaData1.chanlocs.shape[0]-2,metaData1.chanlocs.shape[0]-4,-1)
+  chanixes = [i for i,c in enumerate(metaData1.chanlocs) if c.labels[:-1] == 'MEG224'] #minus 1 because the last 'channel' is MISC
 else:
   chanixes = range(metaData1.chanlocs.shape[0]-1) #minus 1 because the last 'channel' is MISC
+#print chanixes
+#raise
 for channelix in chanixes: 
   print 'Compiling data from channel:',channelix
   #need to reshape because severalMagChannels needs to be channel x samples, and 1-D shapes are flattened by numpy
@@ -465,6 +469,9 @@ if CLUSTER:
       goodness_of_fit1 = bandlm.rsquared_adj
       avefitsig[band] = signif_of_fit
       avefit[band] = (goodness_of_fit0,goodness_of_fit1)
+      if VERBOSE:
+        print clusterid
+        print bandlm.summary()
     avefitsig_dict[ clusterid ] = avefitsig
     avefit_dict[ clusterid ] = avefit
     
@@ -472,14 +479,15 @@ if CLUSTER:
 fitresults = {'r2':avefit_dict,'p':avefitsig_dict} #,'lm':lm_dict,'df':df_dict}
 if CLUSTER:
   fitresults.update({'clustersize':clustersize})
-fname = 'signifresults.multifactor'
+fname = 'sigresults'
 if DEV:
   fname = fname + '.dev'
 else:
   fname = fname + '.test'
 if CLUSTER:
   fname = fname + '.cluster'
-
+if SHORTTEST:
+  fname = fname + '.short'
   
 cPickle.dump(fitresults, open(fname+'.cpk', 'wb'))
 
