@@ -20,14 +20,18 @@ You'll need to create a subdirectory named 'MEG_data' and store the relevant dat
     paired .set and .fdt files containing MEG data  
     a space-delimited .tab file with word-level predictive features  
 
-Once your file structure looks good, if you want to run an interactive notebook session, you'll need to go to the 'notebooks' subdirectory and type  
+Once your file structure looks good, if you want to run an interactive notebook session (outdated), you'll need to go to the 'notebooks' subdirectory and type  
 
     ipython notebook
-
-If you want to run the notebook analyses over each individual channel (and multiple frequency bands) in a single command, you'll need to go to the 'scripts' directory and type  
-
-    python meg_frequency_scanner.py
     
-or you can get stats by going to the 'scripts' directory and typing  
+or you can do non-notebook-based analyses by going to the 'scripts' directory and typing:    
 
     python meg_stats_runner.py
+
+Easy command-line querying of the output from stats_runner can be obtained by typing:  
+
+    python query_stats.py
+    
+Visualization of stats_runner output is available from:  
+
+    notebooks/Topomap_real
