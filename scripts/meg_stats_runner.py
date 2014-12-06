@@ -12,7 +12,7 @@ freqsource = None # determines how the frequency bands are defined #Can be 'weis
 CLUSTER = True #if True: analyses are done over each channel; if False: channels are clustered prior to the analysis
 clustershape = (3,3) #Clustering is done based on sensor position; given (x,y), imagine a grid with x rows and y cols 
 
-SHORTTEST = True #Tests only the MEG analogues to EEG's Pz; requires CLUSTER = False
+SHORTTEST = False #Tests only the MEG analogues to EEG's Pz; Requires CLUSTER = False
 
 LASSO = True #False #if True: use Lasso regression; if False: use ridge regression
 FINDVALS = False #If True, searches for the optimal regression alpha value; Requires LASSO = False
@@ -26,6 +26,8 @@ FUDGE = False # this factor is used to enable and mark dubious code, which can b
 
 if CLUSTER and not LASSO:
   raise #we don't have clustering able to work with ridge regression yet.
+if CLUSTER and SHORTTEST:
+  raise #can't combine cluster analysis and Pz analysis.
 if LASSO and FINDVALS:
   raise #only ridge permits exploring alpha vals
 
@@ -209,7 +211,7 @@ clusterpower = {}
 clustersize = {}
 FIRSTCLUSTER = True
 if SHORTTEST:
-  chanixes = [i for i,c in enumerate(metaData1.chanlocs) if c.labels[:-1] == 'MEG224'] #minus 1 because the last 'channel' is MISC
+  chanixes = [i for i,c in enumerate(metaData1.chanlocs) if c.labels[:-1] == 'MEG224']
 else:
   chanixes = range(metaData1.chanlocs.shape[0]-1) #minus 1 because the last 'channel' is MISC
 

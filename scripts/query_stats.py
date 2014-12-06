@@ -7,9 +7,9 @@ CLUSTER = True #output stats from cluster analysis
 SHORT = False #output stats from Pz-only analysis
 if CLUSTER:
   if DEV:
-    resultsFile = 'signifresults.multifactor.dev.cluster.cpk'
+    resultsFile = 'sigresults.dev.cluster.cpk'
   else:
-    resultsFile = 'signifresults.multifactor.test.cluster.cpk'
+    resultsFile = 'sigresults.test.cluster.cpk'
 else:
   if SHORT:
     if DEV:
