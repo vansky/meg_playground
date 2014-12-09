@@ -9,25 +9,31 @@ devsizerecip = 3 # the reciprocal of the dev size, so devsizerecip = 3 means the
 
 freqsource = None # determines how the frequency bands are defined #Can be 'weiss', 'wiki', or (any other value) an interpolation of the two
 
-CLUSTER = True #if True: analyses are done over each channel; if False: channels are clustered prior to the analysis
+CLUSTER = False #if True: analyses are done over each channel; if False: channels are clustered prior to the analysis
 clustershape = (3,3) #Clustering is done based on sensor position; given (x,y), imagine a grid with x rows and y cols 
 
-SHORTTEST = False #Tests only the MEG analogues to EEG's Pz; Requires CLUSTER = False
+SHORTTEST = True #Tests only the MEG analogues to EEG's Pz; Requires CLUSTER = False
 
-LASSO = True #False #if True: use Lasso regression; if False: use ridge regression
+LASSO = False #False #if True: use Lasso regression; if False: use ridge regression
 FINDVALS = False #If True, searches for the optimal regression alpha value; Requires LASSO = False
 regParam = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 1e+2, 2e+2, 5e+2, 1e+3, 2e+3, 5e+3] #the alpha values to try for FINDVALS
 
 RMOUTLIERS = True #Should outliers be removed? Removes outliers based on each (channel, frequency band)
-OUTDEF = 2 #outliers are defined as those stimuli with dep vars whose value is <= this many std deviations of the mean
+OUTDEF = 3 #outliers are defined as those stimuli with dep vars whose value is <= this many std deviations of the mean
 
+TESTFACTORS = False #Get the correlation matrix of the predictors; Get VIF of each predictor to test for multicollinearity
 VERBOSE = False #Provide some extra output, mainly for development purposes
 FUDGE = False # this factor is used to enable and mark dubious code, which can be cleaned up later; purely for development
 
-if CLUSTER and not LASSO:
-  raise #we don't have clustering able to work with ridge regression yet.
+if CLUSTER and FINDVALS:
+  raise #we don't have clustering able to optimize alpha in ridge regression yet.
 if CLUSTER and SHORTTEST:
   raise #can't combine cluster analysis and Pz analysis.
+if CLUSTER and TESTFACTORS:
+  #haven't implemented collinearity checks in cluster analysis
+  # (and the checks are independent of the analysis),
+  # so either do TESTFACTORS with SHORTTEST or don't do them
+  print 'TESTFACTORS=True, but CLUSTER analysis only outputs a correlation matrix. It doesn\'t do VIF testing.'
 if LASSO and FINDVALS:
   raise #only ridge permits exploring alpha vals
 
@@ -53,6 +59,7 @@ import sys
 import re
 #import statsmodels.api as sm
 import statsmodels.formula.api as smf
+import statsmodels.stats.outliers_influence
 
 #pylab.rcParams['figure.figsize'] = 10,10 #change the default image size for this session
 #pylab.ion()
@@ -130,13 +137,57 @@ wordTrialsBool = numpy.array([p != '' for p in tokenProps['stanfPOS']])
 parsedTrialsBool = numpy.array([d != -1 for d in tokenProps['syndepth']])
 #print(parsedTrialsBool[:10])
 
+sentidlist = numpy.bincount(tokenProps['sentid'][tokenProps['sentid'] != -1]) #gives the sentence length indexed by sentence ID
+sentidlist = sentidlist / float(NUMSUBJS) #account for the fact that we've seen each sentence 3 times (once per subject)
+sentidlist = sentidlist.astype(int)
+validsents = numpy.nonzero((sentidlist > 4) & (sentidlist <= 50))[0]# & (sentidlist >= 5))[0] #only permit sentences with lengths less than 51
+#validsents = numpy.nonzero((sentidlist <= 50))[0]# & (sentidlist >= 5))[0] #only permit sentences with lengths less than 51
+
+#validsents = numpy.nonzero(sentidlist)[0]
+#for i in range(max(sentlens.keys())):
+#  sys.stderr.write(str(i)+':'+str(sentlens.get(i,0))+'\n')
+#tmp = sentidlist > 200 #0 and s < 100]
+#print numpy.nonzero(tmp)
+#for i,t in enumerate(tmp):
+#  if t:
+#  sys.stderr.write(str(s)+'\n')
+#sentids = numpy.nonzero(sentidlist)[0]
+#print 'Sentence Lengths:', sentidlist[sentids]
+#print 'Sentence Lengths:', sentidlist[]
+#tmp = sentidlist[sentids] < 100
+#sentlenhist = numpy.bincount(sentidlist[numpy.nonzero(sentidlist <= 50)])#[sentids][tmp])
+#sentlenhist_readable = numpy.nonzero(sentlenhist)[0]
+#print 'Numsents:', sum(sentlenhist[sentlenhist_readable]), ' 95%:', sum(sentlenhist[sentlenhist_readable])*.95
+#prevs = 0
+#numsents = 0
+#for s in sentlenhist_readable:
+#  numsents += sentlenhist[sentlenhist_readable]
+#  if numsents > 590:
+#    print 'Cutoff:',prevs
+#  prevs = s
+#print 'Sentence Length Counts:', zip(sentlenhist_readable,sentlenhist[sentlenhist_readable])
+#raise
+
+#sys.stderr.write(str(validsents)+'\n')
+
 # Set up the dev and test sets
 devitems = numpy.arange(1,max(tokenProps['sentid']),devsizerecip)
 if FUDGE:
   devitems = numpy.arange(1,max(tokenProps['sentid']),devsizerecip*2) #split dev set in half
-devTrialsBool = numpy.array([s in devitems for s in tokenProps['sentid']])
-testTrialsBool = numpy.array([s not in devitems for s in tokenProps['sentid']])
+devTrialsBool = numpy.array([s in devitems and s in validsents for s in tokenProps['sentid']])
+testTrialsBool = numpy.array([s not in devitems and s in validsents for s in tokenProps['sentid']])
 
+
+#badsents = numpy.nonzero((sentidlist > 50))[0]
+#baddev = []
+#badtest = []
+#for s in badsents:
+#  if s in devitems:
+#    baddev.append((s,sentidlist[s]))
+#  else:
+#    badtest.append((s,sentidlist[s]))
+#sys.stderr.write('Bad Dev'+'\n'+str(baddev)+'\n'+'Bad Test'+'\n'+str(badtest)+'\n')
+#raise
 
 if DEV:
   inDataset = devTrialsBool
@@ -334,7 +385,7 @@ for channelix in chanixes:
 
     # If we've made it this far, we're not clustering...
     for band in freqbands:
-        if VERBOSE or FINDVALS: 
+        if VERBOSE or FINDVALS or TESTFACTORS: 
           sys.stderr.write('Fitting: '+band+'\n')
         modelTrainingFit = []
         modelTestCorrelation = []
@@ -357,12 +408,24 @@ for channelix in chanixes:
           else:
             freqsY = numpy.concatenate(freqsY,mappedTrialFeatures[:,0,freq],axis=1)
 
+        Y = numpy.mean(mynormalise(freqsY),axis=1)
         if not FINDVALS:
-          trainX['Y'] = numpy.mean(mynormalise(freqsY),axis=1)
           if RMOUTLIERS:
-            trainX = trainX[numpy.abs(trainX['Y']-trainX['Y'].mean())<=(OUTDEF*trainX['Y'].std())] #only retain non-outliers
+            trainX = trainX[numpy.abs(Y-Y.mean())<=(OUTDEF*Y.std())] #only retain non-outliers
+            Y = mynormalise(Y[numpy.abs(Y-Y.mean())<=(OUTDEF*Y.std())])
+            trainX = mynormalise(trainX) 
+            if TESTFACTORS and band == 'alpha':
+              #Get VIF to test for multicollinearity
+              for col in range(len(features)):
+                #test each factor for multicollinearity with all the others
+                vif = statsmodels.stats.outliers_influence.variance_inflation_factor(trainX,col)
+                print str(features[col])+': '+str(vif)+'\n'
+          trainX = pd.DataFrame(data = mynormalise(trainX), columns = features)
+          if TESTFACTORS and band == 'alpha':
+            print trainX.corr()
+          trainX['Y'] = Y
         else:
-          Y = numpy.mean(mynormalise(freqsY),axis=1).reshape(-1,1)
+          Y = Y.reshape(-1,1)
         if VERBOSE:
           print trainX.shape
 
@@ -424,11 +487,18 @@ if CLUSTER:
     avefit = {}
     avefitsig = {}
     for band in clusterpower[clusterid]:
-      trainX['Y'] = numpy.mean(mynormalise(clusterpower[clusterid][band]),axis=1)
+      Y = numpy.mean(mynormalise(clusterpower[clusterid][band]),axis=1)
       if RMOUTLIERS:
-        trainXnoout = trainX[numpy.abs(trainX['Y']-trainX['Y'].mean())<=(OUTDEF*trainX['Y'].std())] #only retain non-outliers
+        trainXnoout = trainX[numpy.abs(Y-Y.mean())<=(OUTDEF*Y.std())] #only retain non-outliers
+        Y = mynormalise(Y[numpy.abs(Y-Y.mean())<=(OUTDEF*Y.std())])
+        trainXnoout = pd.DataFrame(data = mynormalise(trainXnoout), columns = features)
+        if band == 'alpha' and TESTFACTORS:
+          print trainXnoout.corr()
+        trainXnoout['Y'] = Y
+        #trainXnoout = trainX[numpy.abs(trainX['Y']-trainX['Y'].mean())<=(OUTDEF*trainX['Y'].std())] #only retain non-outliers
         lm = smf.ols(formula=myform,data=trainXnoout,missing='drop')
       else:
+        trainX['Y'] = Y
         lm = smf.ols(formula=myform,data=trainX,missing='drop')
       if LASSO:
         bandlm = lm.fit_regularized(alpha=0.005) #does a Lasso fit with regularizer parameterized by alpha
@@ -458,6 +528,8 @@ if CLUSTER:
   fname = fname + '.cluster'
 if SHORTTEST:
   fname = fname + '.short'
+else:
+  fname = fname + '.full'
   
 cPickle.dump(fitresults, open(fname+'.cpk', 'wb'))
 

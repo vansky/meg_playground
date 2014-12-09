@@ -2,7 +2,7 @@
 
 import cPickle
 
-DEV = True #output stats from dev data
+DEV = True  #output stats from dev data
 CLUSTER = True #output stats from cluster analysis
 SHORT = False #output stats from Pz-only analysis
 if CLUSTER:
@@ -17,7 +17,11 @@ else:
     else:
       resultsFile = 'sigresults.test.short.cpk'
   else:
-    raise # we don't currently support quick analysis of a full sensor-based annalysis over all channels (too much data); use notebooks/Topomap_real for visualization capabilities
+    # This produces a lot of data; use notebooks/Topomap_real for visualization capabilities
+    if DEV:
+      resultsFile = 'sigresults.dev.full.cpk'
+    else:
+      resultsFile = 'sigresults.test.full.cpk'
   
 rsq = cPickle.load(open(resultsFile))
 
@@ -29,7 +33,7 @@ if CLUSTER:
     print cluster, rsq['clustersize'][cluster]
 
 for stat in ['p']:
-  for band in ['alpha']:
+  for band in ['theta','gamma']:
     print 'Significance in', band
     if not CLUSTER:
       for sensor in rsq[stat]: #['0113','0123','0112','0122','1542','1532','1543','1533']:
