@@ -7,23 +7,8 @@
 DEV = True #if True: analyze the dev set; if False: analyze the test set ;; DEV is defined on a sentence level using a stepsize of N ;; TEST is the complement of DEV
 devsizerecip = 3 # the reciprocal of the dev size, so devsizerecip = 3 means the dev set is 1/3 and the test set is 2/3
 
-freqsource = None # determines how the frequency bands are defined #Can be 'weiss', 'wiki', or (any other value) an interpolation of the two
-
-SHORTTEST = True #Tests only the MEG analogues to EEG's Pz; Requires CLUSTER = False
-
-LASSO = False #False #if True: use Lasso regression; if False: use ridge regression
-FINDVALS = False #If True, searches for the optimal regression alpha value; Requires LASSO = False
-regParam = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 1e+2, 2e+2, 5e+2, 1e+3, 2e+3, 5e+3] #the alpha values to try for FINDVALS
-
-RMOUTLIERS = True #Should outliers be removed? Removes outliers based on each (channel, frequency band)
-OUTDEF = 3 #outliers are defined as those stimuli with dep vars whose value is <= this many std deviations of the mean
-
-TESTFACTORS = False #Get the correlation matrix of the predictors; Get VIF of each predictor to test for multicollinearity
 VERBOSE = False #Provide some extra output, mainly for development purposes
 FUDGE = False # this factor is used to enable and mark dubious code, which can be cleaned up later; purely for development
-
-if LASSO and FINDVALS:
-  raise #only ridge permits exploring alpha vals
 
 # Imports
 # =======
@@ -184,9 +169,10 @@ if True:
     #COHERENCE ANALYSIS
     #freq_decomp = 'wavelet'
     NJOBS = 20 #dignam has 24 processor
-    fmin = 7 #minimum frequency of interest (wavelet); 7
-    fmax = 38 #maximum frequency of interest (wavelet); 30
-
+    fmin = 4 #minimum frequency of interest (wavelet); 7
+    fmax = 50 #maximum frequency of interest (wavelet); 30
+    fstep = 1 #stepsize to get from fmin to fmax 
+    
     names = channelLabels
     seed = list(numpy.arange(len(names)))*len(names)
     targets = numpy.array(seed)
@@ -200,8 +186,9 @@ if True:
     #use morlet wavelet decomposition
     ####
     
-    cwt_frequencies = numpy.arange(fmin, fmax, 2)
-    cwt_n_cycles = cwt_frequencies / 7.
+    cwt_frequencies = numpy.arange(fmin, fmax, fstep)
+    #cwt_n_cycles = cwt_frequencies / 7.
+    cwt_n_cycles = cwt_frequencies
     #Depth 1 coherence
     d1con, freqs, times, _, _ = spectral_connectivity(d1wordEpochs, indices=indices,
                                                       method='coh', mode='cwt_morlet', sfreq=samplingRate,
@@ -229,7 +216,7 @@ if True:
     vmin = min(min(d1con.ravel()),min(d2con.ravel()),min(d3con.ravel()))
     vmax = max(max(d1con.ravel()),max(d2con.ravel()),max(d3con.ravel()))
 
-    fig, axes = plt.subplots(n_rows, n_cols, sharex=True, sharey=True)
+    fig, axes = plt.subplots(n_rows, n_cols, sharex=True, sharey=True, figsize=(15,15))
     plt.suptitle('Between sensor connectivity (coherence)')
     for i in range(n_rows):
       for j in range(n_cols):
@@ -244,13 +231,13 @@ if True:
 
         if j == 0:
           axes[i, j].set_ylabel(names[i])
-          axes[i, j].set_yticks(numpy.arange(len(cwt_frequencies)))
-          axes[i, j].set_yticklabels(cwt_frequencies)
+          axes[i, j].set_yticks(numpy.arange(len(cwt_frequencies))[::2])
+          axes[i, j].set_yticklabels(cwt_frequencies[::2])
           axes[0, i].set_title(names[i])
         if i == (n_rows - 1):
           axes[i, j].set_xlabel(names[j])
-          axes[i, j].set_xticks(numpy.arange(0.0,d1con.shape[3],50))
-          axes[i, j].set_xticklabels(numpy.arange(epochStart,epochEnd,(epochEnd-epochStart)/(d1con.shape[3]/50.)))
+          axes[i, j].set_xticks(numpy.arange(0.0,d1con.shape[3],62.5))
+          axes[i, j].set_xticklabels(numpy.arange(epochStart,epochEnd,(epochEnd-epochStart)/(d1con.shape[3]/62.5)))
         axes[i, j].set_ylim([0.0, d1con.shape[2]-1])
     fig.colorbar(cax)
     if DEV:
@@ -258,7 +245,7 @@ if True:
     else:
       plt.savefig('graphics/coh_d1_test.png')
 
-    fig, axes = plt.subplots(n_rows, n_cols, sharex=True, sharey=True)
+    fig, axes = plt.subplots(n_rows, n_cols, sharex=True, sharey=True, figsize=(15,15))
     plt.suptitle('Between sensor connectivity (coherence)')
     for i in range(n_rows):
       for j in range(n_cols):
@@ -273,13 +260,13 @@ if True:
 
         if j == 0:
           axes[i, j].set_ylabel(names[i])
-          axes[i, j].set_yticks(numpy.arange(len(cwt_frequencies)))
-          axes[i, j].set_yticklabels(cwt_frequencies)
+          axes[i, j].set_yticks(numpy.arange(len(cwt_frequencies))[::2])
+          axes[i, j].set_yticklabels(cwt_frequencies[::2])
           axes[0, i].set_title(names[i])
         if i == (n_rows - 1):
           axes[i, j].set_xlabel(names[j])
-          axes[i, j].set_xticks(numpy.arange(0.0,d2con.shape[3],50))
-          axes[i, j].set_xticklabels(numpy.arange(epochStart,epochEnd,(epochEnd-epochStart)/(d2con.shape[3]/50.)))
+          axes[i, j].set_xticks(numpy.arange(0.0,d2con.shape[3],62.5))
+          axes[i, j].set_xticklabels(numpy.arange(epochStart,epochEnd,(epochEnd-epochStart)/(d2con.shape[3]/62.5)))
         axes[i, j].set_ylim([0.0, d2con.shape[2]-1])
     fig.colorbar(cax)
     if DEV:
@@ -287,7 +274,7 @@ if True:
     else:
       plt.savefig('graphics/coh_d2_test.png')
 
-    fig, axes = plt.subplots(n_rows, n_cols, sharex=True, sharey=True)
+    fig, axes = plt.subplots(n_rows, n_cols, sharex=True, sharey=True, figsize=(15,15))
     plt.suptitle('Between sensor connectivity (coherence)')
     for i in range(n_rows):
       for j in range(n_cols):
@@ -302,13 +289,13 @@ if True:
 
         if j == 0:
           axes[i, j].set_ylabel(names[i])
-          axes[i, j].set_yticks(numpy.arange(len(cwt_frequencies)))
-          axes[i, j].set_yticklabels(cwt_frequencies)
+          axes[i, j].set_yticks(numpy.arange(len(cwt_frequencies))[::2])
+          axes[i, j].set_yticklabels(cwt_frequencies[::2])
           axes[0, i].set_title(names[i])
         if i == (n_rows - 1):
           axes[i, j].set_xlabel(names[j])
-          axes[i, j].set_xticks(numpy.arange(0.0,d3con.shape[3],50))
-          axes[i, j].set_xticklabels(numpy.arange(epochStart,epochEnd,(epochEnd-epochStart)/(d3con.shape[3]/50.)))
+          axes[i, j].set_xticks(numpy.arange(0.0,d3con.shape[3],62.5))
+          axes[i, j].set_xticklabels(numpy.arange(epochStart,epochEnd,(epochEnd-epochStart)/(d3con.shape[3]/62.5)))
         axes[i, j].set_ylim([0.0, d3con.shape[2]-1])
     fig.colorbar(cax)
     if DEV:
