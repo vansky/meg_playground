@@ -9,21 +9,21 @@ devsizerecip = 3 # the reciprocal of the dev size, so devsizerecip = 3 means the
 CWTCYCLEPARAM = 2 # an int parameter to control the temporal/freq resolution of the wavelet decomposition; 2 is good freq resolution, 7 is good temporal resolution
 
 VERBOSE = False #Provide some extra output, mainly for development purposes
-FUDGE = True # this factor is used to enable and mark dubious code, which can be cleaned up later; purely for development
-DRAW = False #Whether or not to draw the coherence connectivity matrix
+FUDGE = False # this factor is used to enable and mark dubious code, which can be cleaned up later; purely for development
+DRAW = True #Whether or not to draw the coherence connectivity matrix
 
 #channelLabels = ['MEG0322', 'MEG0323', 'MEG0342', 'MEG0343', 'MEG0112', 'MEG0113', 'MEG1532', 'MEG1533', 'MEG1712', 'MEG1713']
 channelLabels = ['MEG0322','MEG0323']
 #channelLabels = ['MEG0122','MEG0132','MEG0223','MEG1513','MEG1712']
 # GOODFREQS = the frequencies to significance test for
-GOODFREQS = [34]
+GOODFREQS = [34,35,36]
 
 #coherence analysis settings
 NJOBS = 20 #dignam has 24 processors
-fmin = 33 #minimum frequency of interest (wavelet); 4
-fmax = 36 #maximum frequency of interest (wavelet); 50
+fmin = 4 #minimum frequency of interest (wavelet); 4
+fmax = 50 #maximum frequency of interest (wavelet); 50
 fstep = 1 #stepsize to get from fmin to fmax 
-coherence_step = 4
+coherence_step = 4 #number of epochs to average over when calculating coherence
 
 plusminus = 0
 
@@ -378,6 +378,10 @@ print 'd3wcon',d3wcon.shape
 #for col in range(d21simple.shape[1]):
 #  print cwt_frequencies[col], 'Hz:', scipy.stats.ttest_ind(d21simple[:,col],d32simple[:,col])
 
+d1mcon = numpy.mean(d1wcon,axis=0)
+d2mcon = numpy.mean(d2wcon,axis=0)
+d3mcon = numpy.mean(d3wcon,axis=0)
+
 d1simple = numpy.empty((d1wcon.shape[0],len(cwt_frequencies)))
 d2simple = numpy.empty((d2wcon.shape[0],len(cwt_frequencies)))
 d3simple = numpy.empty((d3wcon.shape[0],len(cwt_frequencies)))
@@ -395,16 +399,15 @@ print d3wcon[0,1,0,0,0:10]
 #print numpy.mean(d1wcon[0,1,1,0])
 
 for i in range(d1simple.shape[0]):
-  for fi in range(d1simple.shape[1]):
+  for fi in GOODFREQS-fmin: #range(d1simple.shape[1]):
     d1simple[i,fi] = numpy.mean(d1wcon[i,1,0,fi])
 for i in range(d2simple.shape[0]):
-  for fi in range(d2simple.shape[1]):
+  for fi in GOODFREQS-fmin: #range(d2simple.shape[1]):
     d2simple[i,fi] = numpy.mean(d2wcon[i,1,0,fi])
 for i in range(d3simple.shape[0]):
-  for fi in range(d3simple.shape[1]):
+  for fi in GOODFREQS-fmin: #range(d3simple.shape[1]):
     d3simple[i,fi] = numpy.mean(d3wcon[i,1,0,fi])
 print 'd1:',numpy.mean(d1simple,axis=0), '::', d1simple.shape
-#print d1simple
 print 'd2:',numpy.mean(d2simple,axis=0), '::', d2simple.shape
 print 'd3:',numpy.mean(d3simple,axis=0), '::', d3simple.shape
 
@@ -412,13 +415,13 @@ conpkg = {'conmats':[],'freqs':freqs,'electrodes':channelLabels}
 
 print 'Writing coherence metrics to disk'
 
-conpkg['conmats'] = d1simple
+conpkg['conmats'] = d1wcon
 with open('cohd1m.pkl','wb') as f:
   pickle.dump(conpkg,f)
-conpkg['conmats'] = d2simple
+conpkg['conmats'] = d2wcon
 with open('cohd2m.pkl','wb') as f:
   pickle.dump(conpkg,f)
-conpkg['conmats'] = d3simple
+conpkg['conmats'] = d3wcon
 with open('cohd3m.pkl','wb') as f:
   pickle.dump(conpkg,f)
   
@@ -483,7 +486,7 @@ for col in range(d1simple.shape[1]):
 #integcon = d2icon - d2mcon
 #fintegcon = d2ficon - d2mcon
 #storcon = d2scon - d2mcon
-#maintcon = d3mcon - d2mcon
+maintcon = d3mcon - d2mcon
 
 #conpkg = {'conmats':[],'freqs':freqs,'electrodes':channelLabels}
 #conpkg['conmats'].append(d32simple)
