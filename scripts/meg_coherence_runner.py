@@ -7,25 +7,44 @@
 DEV = True #if True: analyze the dev set; if False: analyze the test set ;; DEV is defined on a sentence level using a stepsize of N ;; TEST is the complement of DEV
 devsizerecip = 3 # the reciprocal of the dev size, so devsizerecip = 3 means the dev set is 1/3 and the test set is 2/3
 CWTCYCLEPARAM = 2 # an int parameter to control the temporal/freq resolution of the wavelet decomposition; 2 is good freq resolution, 7 is good temporal resolution
+SAVEDATA = False #Take the time to write the coherence data to disk
+SAVEDIR = '/home/scratch/vanschm/meg/' #If saving to disk, which directory should it go in? '' for current dir, otherwise must end in a slash
 
 VERBOSE = False #Provide some extra output, mainly for development purposes
 FUDGE = False # this factor is used to enable and mark dubious code, which can be cleaned up later; purely for development
 DRAW = True #Whether or not to draw the coherence connectivity matrix
 
 #channelLabels = ['MEG0322', 'MEG0323', 'MEG0342', 'MEG0343', 'MEG0112', 'MEG0113', 'MEG1532', 'MEG1533', 'MEG1712', 'MEG1713']
-channelLabels = ['MEG0322','MEG0323']
+channelLabels = ['MEG0223','MEG1513']
+#channelLabels = ['MEG0133','MEG1542']
 #channelLabels = ['MEG0122','MEG0132','MEG0223','MEG1513','MEG1712']
 # GOODFREQS = the frequencies to significance test for
-GOODFREQS = [34,35,36]
+GOODFREQS = [9,10,40,41,42]
+D3 = True
 
 #coherence analysis settings
 NJOBS = 20 #dignam has 24 processors
 fmin = 4 #minimum frequency of interest (wavelet); 4
 fmax = 50 #maximum frequency of interest (wavelet); 50
-fstep = 1 #stepsize to get from fmin to fmax 
+fstep = 1 #stepsize to get from fmin to fmax
+tminsec = 0 #time start to calculate significance over (in seconds)
+tmaxsec = 1 #time end to calculate significance over (in seconds)
+samplingrate = 125
+
 coherence_step = 4 #number of epochs to average over when calculating coherence
 
 plusminus = 0
+
+if DRAW and not D3:
+  print "Can't draw if depth 3 not calculated"
+  raise
+
+#########
+# Autocalculated
+#########
+
+tmin = int(tminsec*samplingrate + samplingrate)
+tmax = int(tmaxsec*samplingrate + samplingrate)
 
 if DEV:
   print ' Using DEV'
@@ -69,6 +88,8 @@ from mne.connectivity import spectral_connectivity, seed_target_indices
 # brian's prototype routines
 from protoMEEGutils import *
 import protoSpectralWinFFTMapper as specfft
+
+GOODFREQS = numpy.array(GOODFREQS)
 
 # Definitions
 # ===========
@@ -146,7 +167,7 @@ def word_connectivity(wordEpochs,indices,step=2):
       print 'cwt_frequencies',cwt_frequencies.shape
       print 'cwt_n_cycles',cwt_n_cycles.shape
     if i % 200 == 0:
-      print 'Epoch %d/%d' % (i,total)
+      print 'Epoch %d/%d (%d)' % (i,total/step,total)
     wordconnectivity[i], freqs, times, _, _ = spectral_connectivity(word, indices=indices,
                                                                     method='coh', mode='cwt_morlet', sfreq=samplingRate,
                                                                     cwt_frequencies=cwt_frequencies, cwt_n_cycles=cwt_n_cycles, n_jobs=NJOBS, verbose='WARNING')
@@ -346,10 +367,12 @@ print 'd3mwordEpochs',d3mwordEpochs.shape
 
 d1wcon = word_connectivity(d1mwordEpochs, indices=indices, step = coherence_step)
 d2wcon = word_connectivity(d2mwordEpochs, indices=indices, step = coherence_step)
-d3wcon = word_connectivity(d3mwordEpochs, indices=indices, step = coherence_step)
+if D3:
+  d3wcon = word_connectivity(d3mwordEpochs, indices=indices, step = coherence_step)
 print 'd1wcon',d1wcon.shape
 print 'd2wcon',d2wcon.shape
-print 'd3wcon',d3wcon.shape
+if D3:
+  print 'd3wcon',d3wcon.shape
 
 #sample only the smallest set to enable t-testing
 #smallest = min(d1wcon.shape[0],d2wcon.shape[0],d3wcon.shape[0])
@@ -380,11 +403,13 @@ print 'd3wcon',d3wcon.shape
 
 d1mcon = numpy.mean(d1wcon,axis=0)
 d2mcon = numpy.mean(d2wcon,axis=0)
-d3mcon = numpy.mean(d3wcon,axis=0)
+if D3:
+  d3mcon = numpy.mean(d3wcon,axis=0)
 
 d1simple = numpy.empty((d1wcon.shape[0],len(cwt_frequencies)))
 d2simple = numpy.empty((d2wcon.shape[0],len(cwt_frequencies)))
-d3simple = numpy.empty((d3wcon.shape[0],len(cwt_frequencies)))
+if D3:
+  d3simple = numpy.empty((d3wcon.shape[0],len(cwt_frequencies)))
 
 #wordEpochs x chans x chans x freqs x timeSamples
 
@@ -394,40 +419,46 @@ print d1wcon[0,1,0,0,0:10]
 print d1wcon[1,1,0,0,0:10]
 print d1wcon[2,1,0,0,0:10]
 print d2wcon[0,1,0,0,0:10]
-print d3wcon[0,1,0,0,0:10]
+if D3:
+  print d3wcon[0,1,0,0,0:10]
 #print numpy.mean(d1wcon[0,1,0,0])
 #print numpy.mean(d1wcon[0,1,1,0])
 
 for i in range(d1simple.shape[0]):
-  for fi in GOODFREQS-fmin: #range(d1simple.shape[1]):
-    d1simple[i,fi] = numpy.mean(d1wcon[i,1,0,fi])
+  for fi in range(d1simple.shape[1]):
+    d1simple[i,fi] = numpy.mean(d1wcon[i,1,0,fi,tmin:tmax])
 for i in range(d2simple.shape[0]):
-  for fi in GOODFREQS-fmin: #range(d2simple.shape[1]):
-    d2simple[i,fi] = numpy.mean(d2wcon[i,1,0,fi])
-for i in range(d3simple.shape[0]):
-  for fi in GOODFREQS-fmin: #range(d3simple.shape[1]):
-    d3simple[i,fi] = numpy.mean(d3wcon[i,1,0,fi])
-print 'd1:',numpy.mean(d1simple,axis=0), '::', d1simple.shape
-print 'd2:',numpy.mean(d2simple,axis=0), '::', d2simple.shape
-print 'd3:',numpy.mean(d3simple,axis=0), '::', d3simple.shape
+  for fi in range(d2simple.shape[1]):
+    d2simple[i,fi] = numpy.mean(d2wcon[i,1,0,fi,tmin:tmax])
+if D3:
+  for i in range(d3simple.shape[0]):
+    for fi in range(d3simple.shape[1]):
+      d3simple[i,fi] = numpy.mean(d3wcon[i,1,0,fi,tmin:tmax])
+print 'd1:',numpy.mean(d1simple,axis=0)[[GOODFREQS-fmin]], '::', d1simple.shape
+print 'd2:',numpy.mean(d2simple,axis=0)[[GOODFREQS-fmin]], '::', d2simple.shape
+if D3:
+  print 'd3:',numpy.mean(d3simple,axis=0)[[GOODFREQS-fmin]], '::', d3simple.shape
 
 conpkg = {'conmats':[],'freqs':freqs,'electrodes':channelLabels}
 
-print 'Writing coherence metrics to disk'
+if SAVEDATA:
+  print 'Writing coherence metrics to disk'
 
-conpkg['conmats'] = d1wcon
-with open('cohd1m.pkl','wb') as f:
-  pickle.dump(conpkg,f)
-conpkg['conmats'] = d2wcon
-with open('cohd2m.pkl','wb') as f:
-  pickle.dump(conpkg,f)
-conpkg['conmats'] = d3wcon
-with open('cohd3m.pkl','wb') as f:
-  pickle.dump(conpkg,f)
+  conpkg['conmats'] = d1wcon
+  with open(SAVEDIR+'cohd1m.pkl','wb') as f:
+    pickle.dump(conpkg,f)
+  conpkg['conmats'] = d2wcon
+  with open(SAVEDIR+'cohd2m.pkl','wb') as f:
+    pickle.dump(conpkg,f)
+  if D3:
+    conpkg['conmats'] = d3wcon
+    with open(SAVEDIR+'cohd3m.pkl','wb') as f:
+      pickle.dump(conpkg,f)
   
-for col in range(d1simple.shape[1]):  
-  print 'd2-d1:', cwt_frequencies[col], 'Hz:', scipy.stats.f_oneway(d1simple[:,col],d2simple[:,col])
-  print 'd3-d2:', cwt_frequencies[col], 'Hz:', scipy.stats.f_oneway(d2simple[:,col],d3simple[:,col])
+for col in GOODFREQS-fmin: #range(d1simple.shape[1]):  
+  print 'd2-d1:', cwt_frequencies[col], 'Hz:', numpy.mean(d2simple,axis=0)[col],'-', numpy.mean(d1simple,axis=0)[col],'p=', scipy.stats.f_oneway(d1simple[:,col],d2simple[:,col])
+  if D3:
+    print 'd3-d2:', cwt_frequencies[col], 'Hz:', numpy.mean(d3simple,axis=0)[col],'-', numpy.mean(d2simple,axis=0)[col],'p=', scipy.stats.f_oneway(d2simple[:,col],d3simple[:,col])
 
 ##save for later
 #with open('d1con.pkl','wb') as f:
@@ -486,7 +517,8 @@ for col in range(d1simple.shape[1]):
 #integcon = d2icon - d2mcon
 #fintegcon = d2ficon - d2mcon
 #storcon = d2scon - d2mcon
-maintcon = d3mcon - d2mcon
+if D3:
+  maintcon = d3mcon - d2mcon
 
 #conpkg = {'conmats':[],'freqs':freqs,'electrodes':channelLabels}
 #conpkg['conmats'].append(d32simple)
