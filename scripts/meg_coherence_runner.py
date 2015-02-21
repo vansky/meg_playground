@@ -13,31 +13,46 @@ SAVEDIR = '/home/scratch/vanschm/meg/' #If saving to disk, which directory shoul
 VERBOSE = False #Provide some extra output, mainly for development purposes
 FUDGE = False # this factor is used to enable and mark dubious code, which can be cleaned up later; purely for development
 DRAW = True #Whether or not to draw the coherence connectivity matrix
+CHECK_NORMALITY = False #Print normality plots
 
 #channelLabels = ['MEG0322', 'MEG0323', 'MEG0342', 'MEG0343', 'MEG0112', 'MEG0113', 'MEG1532', 'MEG1533', 'MEG1712', 'MEG1713']
-channelLabels = ['MEG0223','MEG1513']
+#channelLabels = ['MEG0133','MEG1743']
+channelLabels = ['MEG0133','MEG1713']
 #channelLabels = ['MEG0133','MEG1542']
 #channelLabels = ['MEG0122','MEG0132','MEG0223','MEG1513','MEG1712']
 # GOODFREQS = the frequencies to significance test for
-GOODFREQS = [9,10,40,41,42]
+GOODFREQS = [10]
+GOODFREQS2 = [10]
+GOODFREQS3 = [10]
+
+#GOODFREQS = [6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46]
+D2 = True
 D3 = True
+OPTIMAL = True
+
+if not DEV:
+  if DRAW:
+    print 'No cheating allowed; graphing suppressed'
+    DRAW = False
+  if OPTIMAL:
+    print 'No cheating allowed; optimal search suppressed'
+    OPTIMAL = False
 
 #coherence analysis settings
+plusminus = 2
 NJOBS = 20 #dignam has 24 processors
 fmin = 4 #minimum frequency of interest (wavelet); 4
 fmax = 50 #maximum frequency of interest (wavelet); 50
 fstep = 1 #stepsize to get from fmin to fmax
 tminsec = 0 #time start to calculate significance over (in seconds)
-tmaxsec = 1 #time end to calculate significance over (in seconds)
+tmaxsec = 0.5 #time end to calculate significance over (in seconds)
 samplingrate = 125
 
 coherence_step = 4 #number of epochs to average over when calculating coherence
 
-plusminus = 0
-
-if DRAW and not D3:
-  print "Can't draw if depth 3 not calculated"
-  raise
+#if DRAW and (not D3 or not D2):
+#  print "Can't draw if depth 2 and depth 3 not calculated"
+#  raise
 
 #########
 # Autocalculated
@@ -46,6 +61,7 @@ if DRAW and not D3:
 tmin = int(tminsec*samplingrate + samplingrate)
 tmax = int(tmaxsec*samplingrate + samplingrate)
 
+print str(channelLabels)
 if DEV:
   print ' Using DEV'
 else:
@@ -53,7 +69,11 @@ else:
   if FUDGE:
     print ' Cannot fudge numbers on test set...'
     raise
+print ' Plus/Minus:', str(plusminus), 'Coherence group size:', str(coherence_step)
+if OPTIMAL:
+  print ' Using optimal search based on u-test p-values'
 
+  
 if FUDGE:
   print ' Fudging numbers...'
   
@@ -89,7 +109,10 @@ from mne.connectivity import spectral_connectivity, seed_target_indices
 from protoMEEGutils import *
 import protoSpectralWinFFTMapper as specfft
 
+#GOODFREQS = numpy.arange(6,47)
 GOODFREQS = numpy.array(GOODFREQS)
+GOODFREQS2 = numpy.array(GOODFREQS2)
+GOODFREQS3 = numpy.array(GOODFREQS3)
 
 # Definitions
 # ===========
@@ -149,6 +172,30 @@ def draw_con_matrix(conmat, fnamecode, vmin=None, vmax=None, method = 'coherence
   else:
     plt.savefig('graphics/coh_%s_test.png' % (fnamecode) )
 
+def draw_tgraph(data, fnamecode, vmin=None, vmax=None, valtype='t'):
+  data = data.reshape(-1,1)
+  #draws the tgraph
+  if vmin == None:
+    vmin = min(data.ravel())
+  if vmax == None:
+    vmax = max(data.ravel())
+
+  fig = plt.figure()
+
+  plt.suptitle('Frequency %s-values (|%s|)' % (valtype,valtype))
+  ax = fig.add_subplot(111)
+
+  cax = ax.matshow(data, interpolation='nearest', vmin=vmin, vmax=vmax, cmap='binary')
+  plt.gca().invert_yaxis()
+  fig.colorbar(cax)
+
+  ax.set_yticks(numpy.arange(len(cwt_frequencies))[::6])
+  ax.set_yticklabels(cwt_frequencies[::6])
+
+  if DEV:
+    plt.savefig('graphics/%sgraph_%s_dev.png' % (valtype,fnamecode) )
+  else:
+    plt.savefig('graphics/%sgraph_%s_test.png' % (valtype,fnamecode) )
 
 def word_connectivity(wordEpochs,indices,step=2):
   wordconnectivity = numpy.empty((int(wordEpochs.shape[0]/step),wordEpochs.shape[1],wordEpochs.shape[1],len(cwt_frequencies),epochLength*samplingRate))
@@ -367,7 +414,7 @@ print 'd3mwordEpochs',d3mwordEpochs.shape
 
 d1wcon = word_connectivity(d1mwordEpochs, indices=indices, step = coherence_step)
 d2wcon = word_connectivity(d2mwordEpochs, indices=indices, step = coherence_step)
-if D3:
+if D3 or DRAW:
   d3wcon = word_connectivity(d3mwordEpochs, indices=indices, step = coherence_step)
 print 'd1wcon',d1wcon.shape
 print 'd2wcon',d2wcon.shape
@@ -403,43 +450,64 @@ if D3:
 
 d1mcon = numpy.mean(d1wcon,axis=0)
 d2mcon = numpy.mean(d2wcon,axis=0)
-if D3:
+if D3 or DRAW:
   d3mcon = numpy.mean(d3wcon,axis=0)
 
+d1simplea = numpy.empty((d1wcon.shape[0],len(cwt_frequencies)))
+d2simplea = numpy.empty((d2wcon.shape[0],len(cwt_frequencies)))
+if D3 or DRAW:
+  d3simplea = numpy.empty((d3wcon.shape[0],len(cwt_frequencies)))
 d1simple = numpy.empty((d1wcon.shape[0],len(cwt_frequencies)))
 d2simple = numpy.empty((d2wcon.shape[0],len(cwt_frequencies)))
-if D3:
+if D3 or DRAW:
   d3simple = numpy.empty((d3wcon.shape[0],len(cwt_frequencies)))
 
 #wordEpochs x chans x chans x freqs x timeSamples
 
 #print numpy.mean(d1wcon[0,0,0,0])
 #print numpy.mean(d1wcon[0,0,1,0])
-print d1wcon[0,1,0,0,0:10]
-print d1wcon[1,1,0,0,0:10]
-print d1wcon[2,1,0,0,0:10]
-print d2wcon[0,1,0,0,0:10]
-if D3:
-  print d3wcon[0,1,0,0,0:10]
+#print d1wcon[0,1,0,0,0:10]
+#print d1wcon[1,1,0,0,0:10]
+#print d1wcon[2,1,0,0,0:10]
+#print d2wcon[0,1,0,0,0:10]
+#print d3wcon[0,1,0,0,0:10]
 #print numpy.mean(d1wcon[0,1,0,0])
 #print numpy.mean(d1wcon[0,1,1,0])
 
 for i in range(d1simple.shape[0]):
   for fi in range(d1simple.shape[1]):
-    d1simple[i,fi] = numpy.mean(d1wcon[i,1,0,fi,tmin:tmax])
+    d1simplea[i,fi] = numpy.mean(d1wcon[i,1,0,fi,tmin:tmax])
 for i in range(d2simple.shape[0]):
   for fi in range(d2simple.shape[1]):
-    d2simple[i,fi] = numpy.mean(d2wcon[i,1,0,fi,tmin:tmax])
-if D3:
+    d2simplea[i,fi] = numpy.mean(d2wcon[i,1,0,fi,tmin:tmax])
+if D3 or DRAW:
   for i in range(d3simple.shape[0]):
     for fi in range(d3simple.shape[1]):
-      d3simple[i,fi] = numpy.mean(d3wcon[i,1,0,fi,tmin:tmax])
-print 'd1:',numpy.mean(d1simple,axis=0)[[GOODFREQS-fmin]], '::', d1simple.shape
-print 'd2:',numpy.mean(d2simple,axis=0)[[GOODFREQS-fmin]], '::', d2simple.shape
-if D3:
-  print 'd3:',numpy.mean(d3simple,axis=0)[[GOODFREQS-fmin]], '::', d3simple.shape
+      d3simplea[i,fi] = numpy.mean(d3wcon[i,1,0,fi,tmin:tmax])
+if plusminus != 0:
+  #average over multiple frequencies
+  for i in range(d1simple.shape[0]):
+    for fi in range(d1simple.shape[1]):
+      d1simple[i,fi] = numpy.mean(d1simplea[i,max(0,fi-plusminus):min(d1simple.shape[1],fi+plusminus+1)])
+  for i in range(d2simple.shape[0]):
+    for fi in range(d2simple.shape[1]):
+      d2simple[i,fi] = numpy.mean(d2simplea[i,max(0,fi-plusminus):min(d2simple.shape[1],fi+plusminus+1)])
+  if D3 or DRAW:
+    for i in range(d3simple.shape[0]):
+      for fi in range(d3simple.shape[1]):
+        d3simple[i,fi] = numpy.mean(d3simplea[i,max(0,fi-plusminus):min(d3simple.shape[1],fi+plusminus+1)])
+      
+#print 'd1:',numpy.mean(d1simple,axis=0)[[GOODFREQS-fmin]], '::', d1simple.shape
+#print 'd2:',numpy.mean(d2simple,axis=0)[[GOODFREQS-fmin]], '::', d2simple.shape
+#if D3 or DRAW:
+#  print 'd3:',numpy.mean(d3simple,axis=0)[[GOODFREQS-fmin]], '::', d3simple.shape
 
 conpkg = {'conmats':[],'freqs':freqs,'electrodes':channelLabels}
+
+tgraph2 = numpy.empty((len(cwt_frequencies),))
+tgraph3 = numpy.empty((len(cwt_frequencies),))
+ugraph2 = numpy.empty((len(cwt_frequencies),))
+ugraph3 = numpy.empty((len(cwt_frequencies),))
 
 if SAVEDATA:
   print 'Writing coherence metrics to disk'
@@ -450,16 +518,45 @@ if SAVEDATA:
   conpkg['conmats'] = d2wcon
   with open(SAVEDIR+'cohd2m.pkl','wb') as f:
     pickle.dump(conpkg,f)
-  if D3:
+  if D3 or DRAW:
     conpkg['conmats'] = d3wcon
     with open(SAVEDIR+'cohd3m.pkl','wb') as f:
       pickle.dump(conpkg,f)
-  
-for col in GOODFREQS-fmin: #range(d1simple.shape[1]):  
-  print 'd2-d1:', cwt_frequencies[col], 'Hz:', numpy.mean(d2simple,axis=0)[col],'-', numpy.mean(d1simple,axis=0)[col],'p=', scipy.stats.f_oneway(d1simple[:,col],d2simple[:,col])
-  if D3:
-    print 'd3-d2:', cwt_frequencies[col], 'Hz:', numpy.mean(d3simple,axis=0)[col],'-', numpy.mean(d2simple,axis=0)[col],'p=', scipy.stats.f_oneway(d2simple[:,col],d3simple[:,col])
 
+if DEV:
+  for fi in range(len(cwt_frequencies)):
+    tgraph2[fi] = abs(scipy.stats.f_oneway(d1simple[:,fi],d2simple[:,fi])[0])
+    tgraph3[fi] = abs(scipy.stats.f_oneway(d2simple[:,fi],d3simple[:,fi])[0])
+    ugraph2[fi] = abs(scipy.stats.mannwhitneyu(d1simple[:,fi],d2simple[:,fi])[1])
+    ugraph3[fi] = abs(scipy.stats.mannwhitneyu(d2simple[:,fi],d3simple[:,fi])[1])
+
+if OPTIMAL:
+  if D2:
+    for col in numpy.where(ugraph2 < 0.05)[0].ravel():
+      print 'd2-d1:', cwt_frequencies[col], 'Hz:', numpy.mean(d2simple,axis=0)[col],'-', numpy.mean(d1simple,axis=0)[col],'p=', scipy.stats.f_oneway(d1simple[:,col],d2simple[:,col]), 'u=',scipy.stats.mannwhitneyu(d1simple[:,col],d2simple[:,col])
+  if D3:
+    for col in numpy.where(ugraph3 < 0.05)[0].ravel():
+      print 'd3-d2:', cwt_frequencies[col], 'Hz:', numpy.mean(d3simple,axis=0)[col],'-', numpy.mean(d2simple,axis=0)[col],'p=', scipy.stats.f_oneway(d2simple[:,col],d3simple[:,col]),'u=', scipy.stats.mannwhitneyu(d2simple[:,col],d3simple[:,col])
+else:
+  for col in GOODFREQS-fmin: #range(d1simple.shape[1]):
+    if D2:
+      if DEV or (not DEV and col in GOODFREQS2-fmin):
+        print 'd2-d1:', cwt_frequencies[col], 'Hz:', numpy.mean(d2simple,axis=0)[col],'-', numpy.mean(d1simple,axis=0)[col],'p=', scipy.stats.f_oneway(d1simple[:,col],d2simple[:,col]), 'u=',scipy.stats.mannwhitneyu(d1simple[:,col],d2simple[:,col])
+        if CHECK_NORMALITY:
+          scipy.stats.probplot(d1simple[:,col], dist="norm", plot=plt)
+          plt.savefig('graphics/norm1.png')
+          plt.close("all")
+          scipy.stats.probplot(d2simple[:,col], dist="norm", plot=plt)
+          plt.savefig('graphics/norm2.png')
+          plt.close("all")
+    if D3:
+      if DEV or (not DEV and col in GOODFREQS3-fmin):
+        print 'd3-d2:', cwt_frequencies[col], 'Hz:', numpy.mean(d3simple,axis=0)[col],'-', numpy.mean(d2simple,axis=0)[col],'p=', scipy.stats.f_oneway(d2simple[:,col],d3simple[:,col]),'u=', scipy.stats.mannwhitneyu(d2simple[:,col],d3simple[:,col])
+        if CHECK_NORMALITY:
+          scipy.stats.probplot(d3simple[:,col], dist="norm", plot=plt)
+          plt.savefig('graphics/norm3.png')
+          plt.close("all")    
+      
 ##save for later
 #with open('d1con.pkl','wb') as f:
 #  pickle.dump(d1con,f)
@@ -517,8 +614,6 @@ for col in GOODFREQS-fmin: #range(d1simple.shape[1]):
 #integcon = d2icon - d2mcon
 #fintegcon = d2ficon - d2mcon
 #storcon = d2scon - d2mcon
-if D3:
-  maintcon = d3mcon - d2mcon
 
 #conpkg = {'conmats':[],'freqs':freqs,'electrodes':channelLabels}
 #conpkg['conmats'].append(d32simple)
@@ -531,15 +626,20 @@ if D3:
 #    pickle.dump(conpkg,f)
 
 if DRAW:
+  maintcon3 = d3mcon - d2mcon
+  maintcon2 = d2mcon - d1mcon
+
+  #vmin = -0.06
   vmin = None
+  #vmax = 0.06
   vmax = None
   
   print 'Computing means'
   #+/- 2 Hz, 0-.5s, 25 & 40 Hz
-  third = int(maintcon.shape[3]/3.)
+  third = int(maintcon3.shape[3]/3.)
   sixth = int(third * .5)
   twelfth = int(sixth * .5)
-  print maintcon.shape
+  print maintcon3.shape
   #for findex,freq in zip(findices,GOODFREQS):
     #print 'index:', findex, 'freq:',freq
     #print str(freq)+':', numpy.mean(maintcon[1,0,findex-plusminus:findex+plusminus+1,third-sixth:third+sixth],axis=1)
@@ -563,8 +663,10 @@ if DRAW:
   #draw_con_matrix(integcon, 'integration', vmin, vmax)
   #draw_con_matrix(storcon, 'storage', vmin, vmax)
   if DEV:
-    draw_con_matrix(maintcon, 'maintenance', vmin, vmax)
-  else:
-    print 'No cheating allowed; graphing suppressed'
-  
+    draw_con_matrix(maintcon3, 'maintenance3'+str(plusminus), vmin, vmax)
+    draw_tgraph(tgraph3, 'tgraph3'+str(plusminus), 0, None, 't')
+    draw_tgraph(ugraph3, 'ugraph3'+str(plusminus), None, 0.05, 'u')
+    draw_con_matrix(maintcon2, 'maintenance2'+str(plusminus), vmin, vmax)
+    draw_tgraph(tgraph2, 'tgraph2'+str(plusminus), 0, None, 't')
+    draw_tgraph(ugraph2, 'ugraph2'+str(plusminus), None, 0.05, 'u')
   #run_ttest((d1wcon,d2wcon,d3wcon),Tchannels,GOODFREQ)
