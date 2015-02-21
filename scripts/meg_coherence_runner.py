@@ -313,7 +313,7 @@ d4TrialsBool = numpy.array([d == 4 for d in tokenProps['syndepth']])
 fintegTrialsBool = numpy.array([d < 0 for d in tokenProps['futdeltadepth']]) #location of hypothesized integration cost
 integTrialsBool = numpy.array([d < 0 for d in tokenProps['deltadepth']]) #location of hypothesized integration cost
 storTrialsBool = numpy.array([d > 0 for d in tokenProps['deltadepth']]) #location of hypothesized storage cost
-maintTrialsBool = numpy.array([d == 0 for d in tokenProps['deltadepth']]) #location of hypothesized storage cost
+maintTrialsBool = numpy.array([d == 0 for d in tokenProps['deltadepth']]) #location of hypothesized maintenance cost
 
 sentidlist = numpy.bincount(tokenProps['sentid'][tokenProps['sentid'] != -1]) #gives the sentence length indexed by sentence ID
 sentidlist = sentidlist / float(NUMSUBJS) #account for the fact that we've seen each sentence 3 times (once per subject)
@@ -372,6 +372,8 @@ d1mwordEpochs = epochedSignalData[wordTrialsBool & maintTrialsBool & inDataset &
 d2mwordEpochs = epochedSignalData[wordTrialsBool & maintTrialsBool & inDataset & d2TrialsBool]
 d3mwordEpochs = epochedSignalData[wordTrialsBool & maintTrialsBool & inDataset & d3TrialsBool]
 #wordFeatures = tokenProps[wordTrialsBool & parsedTrialsBool & inDataset]
+#mwordEpochs = epochedSignalData[wordTrialsBool & maintTrialsBool & inDataset]
+#mwordFeatures = tokenProps[wordTrialsBool & maintTrialsBool & inDataset]
 #d1wordFeatures = tokenProps[wordTrialsBool & d1TrialsBool & inDataset]
 #d2wordFeatures = tokenProps[wordTrialsBool & d2TrialsBool & inDataset]
 #d3wordFeatures = tokenProps[wordTrialsBool & d3TrialsBool & inDataset]
@@ -404,10 +406,12 @@ print 'Calculating coherence'
 #d1con, freqs, times, _, _ = spectral_connectivity(d1mwordEpochs[0:200], indices=indices,
 #                                                  method='coh', mode='cwt_morlet', sfreq=samplingRate,
 #                                                  cwt_frequencies=cwt_frequencies, cwt_n_cycles=cwt_n_cycles, n_jobs=NJOBS, verbose='WARNING')
+
 if FUDGE:
   d1mwordEpochs = d1mwordEpochs[0:200]
   d2mwordEpochs = d2mwordEpochs[0:200]
   d3mwordEpochs = d3mwordEpochs[0:200]
+
 print 'd1mwordEpochs',d1mwordEpochs.shape
 print 'd2mwordEpochs',d2mwordEpochs.shape
 print 'd3mwordEpochs',d3mwordEpochs.shape
@@ -420,33 +424,6 @@ print 'd1wcon',d1wcon.shape
 print 'd2wcon',d2wcon.shape
 if D3:
   print 'd3wcon',d3wcon.shape
-
-#sample only the smallest set to enable t-testing
-#smallest = min(d1wcon.shape[0],d2wcon.shape[0],d3wcon.shape[0])
-
-#shapes.index(min(shapes))
-
-#d1wcon = dynpool(d1wcon,smallest)
-#d2wcon = dynpool(d2wcon,smallest)
-#d3wcon = dynpool(d3wcon,smallest)
-
-#Can't do this because d1,d2,d3 don't have the same number of samples
-#d32 = d3wcon - d2wcon
-#d21 = d2wcon - d1wcon
-#
-#d32simple = numpy.empty((d32.shape[0],len(cwt_frequencies)))
-#d21simple = numpy.empty((d21.shape[0],len(cwt_frequencies)))
-#
-#for i in range(d32simple.shape[0]):
-#  for fi in range(d32simple.shape[1]):
-#    d32simple[i,fi] = numpy.mean(d32[i,1,0,fi])
-#for i in range(d21simple.shape[0]):
-#  for fi in range(d21simple.shape[1]):
-#    d21simple[i,fi] = numpy.mean(d21[i,1,0,fi])
-#print 'd3-d2:',numpy.mean(d32simple,axis=0)
-#print 'd2-d1:',numpy.mean(d21simple,axis=0)
-#for col in range(d21simple.shape[1]):
-#  print cwt_frequencies[col], 'Hz:', scipy.stats.ttest_ind(d21simple[:,col],d32simple[:,col])
 
 d1mcon = numpy.mean(d1wcon,axis=0)
 d2mcon = numpy.mean(d2wcon,axis=0)
@@ -496,7 +473,12 @@ if plusminus != 0:
     for i in range(d3simple.shape[0]):
       for fi in range(d3simple.shape[1]):
         d3simple[i,fi] = numpy.mean(d3simplea[i,max(0,fi-plusminus):min(d3simple.shape[1],fi+plusminus+1)])
-      
+else:
+  d1simple = d1simplea
+  d2simple = d2simplea
+  if D3 or DRAW:
+    d3simple = d3simplea
+
 #print 'd1:',numpy.mean(d1simple,axis=0)[[GOODFREQS-fmin]], '::', d1simple.shape
 #print 'd2:',numpy.mean(d2simple,axis=0)[[GOODFREQS-fmin]], '::', d2simple.shape
 #if D3 or DRAW:
@@ -529,7 +511,6 @@ if DEV:
     tgraph3[fi] = abs(scipy.stats.f_oneway(d2simple[:,fi],d3simple[:,fi])[0])
     ugraph2[fi] = abs(scipy.stats.mannwhitneyu(d1simple[:,fi],d2simple[:,fi])[1])
     ugraph3[fi] = abs(scipy.stats.mannwhitneyu(d2simple[:,fi],d3simple[:,fi])[1])
-
 if OPTIMAL:
   if D2:
     for col in numpy.where(ugraph2 < 0.05)[0].ravel():
@@ -538,7 +519,7 @@ if OPTIMAL:
     for col in numpy.where(ugraph3 < 0.05)[0].ravel():
       print 'd3-d2:', cwt_frequencies[col], 'Hz:', numpy.mean(d3simple,axis=0)[col],'-', numpy.mean(d2simple,axis=0)[col],'p=', scipy.stats.f_oneway(d2simple[:,col],d3simple[:,col]),'u=', scipy.stats.mannwhitneyu(d2simple[:,col],d3simple[:,col])
 else:
-  for col in GOODFREQS-fmin: #range(d1simple.shape[1]):
+  for col in GOODFREQS-fmin:
     if D2:
       if DEV or (not DEV and col in GOODFREQS2-fmin):
         print 'd2-d1:', cwt_frequencies[col], 'Hz:', numpy.mean(d2simple,axis=0)[col],'-', numpy.mean(d1simple,axis=0)[col],'p=', scipy.stats.f_oneway(d1simple[:,col],d2simple[:,col]), 'u=',scipy.stats.mannwhitneyu(d1simple[:,col],d2simple[:,col])
@@ -629,9 +610,7 @@ if DRAW:
   maintcon3 = d3mcon - d2mcon
   maintcon2 = d2mcon - d1mcon
 
-  #vmin = -0.06
   vmin = None
-  #vmax = 0.06
   vmax = None
   
   print 'Computing means'
