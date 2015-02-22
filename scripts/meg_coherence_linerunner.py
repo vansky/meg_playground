@@ -4,7 +4,7 @@
 # Global Vars
 # =======
 
-DEV = True #if True: analyze the dev set; if False: analyze the test set ;; DEV is defined on a sentence level using a stepsize of N ;; TEST is the complement of DEV
+DEV = True # if True: analyze the dev set; if False: analyze the test set ;; DEV is defined on a sentence level using a stepsize of N ;; TEST is the complement of DEV
 devsizerecip = 3 # the reciprocal of the dev size, so devsizerecip = 3 means the dev set is 1/3 and the test set is 2/3
 CWTCYCLEPARAM = 2 # an int parameter to control the temporal/freq resolution of the wavelet decomposition; 2 is good freq resolution, 7 is good temporal resolution
 SAVEDATA = False #Take the time to write the coherence data to disk
@@ -18,11 +18,11 @@ channelLabels = ['MEG0132','MEG1712']
 #channelLabels = ['MEG0133','MEG1542']
 #channelLabels = ['MEG0122','MEG0132','MEG0223','MEG1513','MEG1712']
 # GOODFREQS = the frequencies to significance test for
-GOODFREQS = [10]
-GOODFREQS2 = [10]
-GOODFREQS3 = [10]
+GOODFREQS = [32,42]
 
-featureName = 'bigramLogProbBack_COCA'
+# logFreq_ANC     bigramLogProbBack_COCA  trigramLogProbBack_COCA surprisal2back_COCA
+featureName = 'surprisal2back_COCA'
+
 
 #GOODFREQS = [6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46]
 
@@ -85,10 +85,7 @@ from mne.connectivity import spectral_connectivity, seed_target_indices
 from protoMEEGutils import *
 import protoSpectralWinFFTMapper as specfft
 
-#GOODFREQS = numpy.arange(6,47)
 GOODFREQS = numpy.array(GOODFREQS)
-GOODFREQS2 = numpy.array(GOODFREQS2)
-GOODFREQS3 = numpy.array(GOODFREQS3)
 
 # Definitions
 # ===========
@@ -412,6 +409,11 @@ else:
 
 msimple = msimple.transpose() # freqs x epochs
 
-for fi in msimple:
-  slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(myMeanFeatures,msimple[fi])
-  print fi+fmin,'Hz:', 'm:',slope, 'b:',intercept, 'R2:',r_value, 'sigma:',std_err, 'p:',p_value
+if DEV:
+  for fi in range(msimple.shape[0]):
+    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(myMeanFeatures,msimple[fi])
+    print fi+fmin,'Hz:', 'm:',slope, 'b:',intercept, 'R2:',r_value, 'sigma:',std_err, 'p:',p_value
+else:
+  for fi in GOODFREQS-fmin:
+    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(myMeanFeatures,msimple[fi])
+    print fi+fmin,'Hz:', 'm:',slope, 'b:',intercept, 'R2:',r_value, 'sigma:',std_err, 'p:',p_value

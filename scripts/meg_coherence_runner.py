@@ -17,7 +17,8 @@ CHECK_NORMALITY = False #Print normality plots
 
 #channelLabels = ['MEG0322', 'MEG0323', 'MEG0342', 'MEG0343', 'MEG0112', 'MEG0113', 'MEG1532', 'MEG1533', 'MEG1712', 'MEG1713']
 #channelLabels = ['MEG0133','MEG1743']
-channelLabels = ['MEG0133','MEG1713']
+#channelLabels = ['MEG0133','MEG1743']
+channelLabels = ['MEG0133','MEG2512']
 #channelLabels = ['MEG0133','MEG1542']
 #channelLabels = ['MEG0122','MEG0132','MEG0223','MEG1513','MEG1712']
 # GOODFREQS = the frequencies to significance test for
@@ -61,6 +62,7 @@ coherence_step = 4 #number of epochs to average over when calculating coherence
 tmin = int(tminsec*samplingrate + samplingrate)
 tmax = int(tmaxsec*samplingrate + samplingrate)
 
+channelNumbers = [chan[-4:] for chan in channelLabels]
 print str(channelLabels)
 if DEV:
   print ' Using DEV'
@@ -641,11 +643,12 @@ if DRAW:
   #draw_con_matrix(fintegcon, 'fintegration', vmin, vmax)
   #draw_con_matrix(integcon, 'integration', vmin, vmax)
   #draw_con_matrix(storcon, 'storage', vmin, vmax)
+  namemod = str(plusminus)+'_'+str(channelNumbers[0])+'-'+str(channelNumbers[1])
   if DEV:
-    draw_con_matrix(maintcon3, 'maintenance3'+str(plusminus), vmin, vmax)
-    draw_tgraph(tgraph3, 'tgraph3'+str(plusminus), 0, None, 't')
-    draw_tgraph(ugraph3, 'ugraph3'+str(plusminus), None, 0.05, 'u')
-    draw_con_matrix(maintcon2, 'maintenance2'+str(plusminus), vmin, vmax)
-    draw_tgraph(tgraph2, 'tgraph2'+str(plusminus), 0, None, 't')
-    draw_tgraph(ugraph2, 'ugraph2'+str(plusminus), None, 0.05, 'u')
+    draw_con_matrix(maintcon3, 'maintenance3'+namemod, vmin, vmax)
+    draw_tgraph(tgraph3, 'tgraph3'+namemod, 0, None, 't')
+    draw_tgraph(ugraph3, 'ugraph3'+namemod, None, 0.05, 'u')
+    draw_con_matrix(maintcon2, 'maintenance2'+namemod, vmin, vmax)
+    draw_tgraph(tgraph2, 'tgraph2'+namemod, 0, None, 't')
+    draw_tgraph(ugraph2, 'ugraph2'+namemod, None, 0.05, 'u')
   #run_ttest((d1wcon,d2wcon,d3wcon),Tchannels,GOODFREQ)
