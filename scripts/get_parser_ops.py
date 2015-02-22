@@ -12,10 +12,11 @@ for line in sys.stdin.readlines():
   line = line.strip()
   if line == '()':
     output.append('BADPARSE BADPARSE')
+    continue
   mycat = ''
   myword = ''
   build_cat = False
-  for cix,char in enumerate(line):
+  for char in line:
     if char == '(':
       build_cat = True
       mycat = ''
@@ -38,4 +39,6 @@ for line in sys.stdin.readlines():
       else:
         #build up the word
         myword = myword + char
+  #add final word/cat pair to output
+  output.append(mycat + ' ' + myword)
 sys.stdout.write('\n'.join(output)+'\n')
