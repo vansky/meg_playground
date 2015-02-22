@@ -1,4 +1,4 @@
-# buildtab.py tableFile newcolFile
+# addparserops.py tableFile newcolFile > newtable
 # newcolFile has two columns
 
 import re
