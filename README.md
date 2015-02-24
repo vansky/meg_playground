@@ -35,3 +35,13 @@ Easy command-line querying of the output from stats_runner can be obtained by ty
 Visualization of stats_runner output is available from:  
 
     notebooks/Topomap_real
+
+To obtain the V7.tab file with feature annotations:
+
+    Begin with the V3.tab file from the MEG HOD corpus.  
+    Obtain the gcgbadwords, gcgparseops, and totsurp files from the authors (or from /home/corpora)  
+    python ../scripts/buildtab.py hod_V3.tab hod.wsj02to21-comparativized-gcg15-1671-4sm.fullberk.parsed.gcgbadwords > hod_V4.tab  
+    python ../scripts/addsentid.py hod_V4.tab > hod_V5.tab  
+    python ../scripts/addparserops.py hod_V5.tab hod.wsj02to21-comparativized-gcg15-1671-4sm.fullberk.parsed.gcgparseops > hod_V6.tab  
+    python ../scripts/addtotsurp.py hod_V6.tab hod.totsurp > hod_V7.tab
+    Set tokenPropsFile = <.tab filename>  
