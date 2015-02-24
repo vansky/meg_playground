@@ -118,10 +118,12 @@ def mynormalise(A):
 (megFileTag3, megFile3) = ('C_TSSS_0.01-50Hz_@125', 'aud_hofd_c_allRuns_tsss_audiobookPrepro_stPad1_lp50_resamp125_frac10ICAed_hp0.010000.set')
 
 ## put your on properties in here, as a .tab file of similar format (tab delimited, and field names in a first comment line - should be easy to do in excel...)
-#to get the V5.tab:
+#to get the V7.tab:
 #  python ../scripts/buildtab.py hod_JoeTimes_LoadsaFeaturesV3.tab hod.wsj02to21-comparativized-gcg15-1671-4sm.fullberk.parsed.gcgbadwords > hod_JoeTimes_LoadsaFeaturesV4.tab
 #  python ../scripts/addsentid.py hod_JoeTimes_LoadsaFeaturesV4.tab > hod_JoeTimes_LoadsaFeaturesV5.tab
-tokenPropsFile = 'hod_JoeTimes_LoadsaFeaturesV5.tab' # best yet! have automatic Stanford tagging, several word length and freq measures, and also the 2 and 3 token back-grams
+#  python ../scripts/addparserops.py hod_JoeTimes_LoadsaFeaturesV5.tab hod.wsj02to21-comparativized-gcg15-1671-4sm.fullberk.parsed.gcgparseops > hod_JoeTimes_LoadsaFeaturesV6.tab
+#  python ../scripts/addtotsurp.py hod_JoeTimes_LoadsaFeaturesV6.tab hod.totsurp > hod_JoeTimes_LoadsaFeaturesV7.tab
+tokenPropsFile = 'hod_JoeTimes_LoadsaFeaturesV7.tab' # best yet! have automatic Stanford tagging, several word length and freq measures, and also the 2 and 3 token back-grams
 
 # WHICH CHANNELS TO LOOK AT AS ERFS
 #*# MARTY #*# decide which channels to use - channels of interest are the first few you can look at in an ERF, and then from them you can choose one at a time with "channelToAnalyse" for the actual regression analysis #*#
@@ -132,7 +134,7 @@ channelLabels = ['MEG0111', 'MEG0121', 'MEG0131', 'MEG0211', 'MEG0212', 'MEG0213
 #*# MARTY #*# change dtype to suit the files in your .tab file #*#
 tokenProps = scipy.genfromtxt(tokenPropsFile,
                               delimiter='\t',names=True,
-                              dtype="i4,f4,f4,S50,S50,i2,i2,i2,S10,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,i1,>i4")
+                              dtype="i4,f4,f4,S50,S50,i2,i2,i2,S10,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,i1,>i4,S4,f8")
 # ... and temporarily save as cpickle archive to satisfy the way I programmed the convenience function loadBookMEGWithAudio (it expects to find the same info in a C-pickle file, and so doesn't need to know about number and type of fields)
 tokenPropsPickle = tokenPropsFile+'.cpk'
 cPickle.dump(tokenProps, open(tokenPropsPickle, 'wb'))
