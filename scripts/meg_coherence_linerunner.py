@@ -18,10 +18,10 @@ channelLabels = ['MEG0132','MEG1712']
 #channelLabels = ['MEG0133','MEG1542']
 #channelLabels = ['MEG0122','MEG0132','MEG0223','MEG1513','MEG1712']
 # GOODFREQS = the frequencies to significance test for
-GOODFREQS = [32,42]
+GOODFREQS = [10]
 
 # logFreq_ANC     bigramLogProbBack_COCA  trigramLogProbBack_COCA surprisal2back_COCA
-featureName = 'surprisal2back_COCA'
+featureName = 'totsurp'
 
 
 #GOODFREQS = [6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46]
@@ -237,13 +237,13 @@ def run_ttest(wordesfreqtimes,goodcols,goodfreq):
 #to get the V5.tab:
 #  python ../scripts/buildtab.py hod_JoeTimes_LoadsaFeaturesV3.tab hod.wsj02to21-comparativized-gcg15-1671-4sm.fullberk.parsed.gcgbadwords > hod_JoeTimes_LoadsaFeaturesV4.tab
 #  python ../scripts/expandtab.py hod_JoeTimes_LoadsaFeaturesV4.tab > hod_JoeTimes_LoadsaFeaturesV5.tab
-tokenPropsFile = '../MEG_data/hod_JoeTimes_LoadsaFeaturesV5.tab'
+tokenPropsFile = '../MEG_data/hod_JoeTimes_LoadsaFeaturesV7.tab'
 
 # LOAD WORD PROPS
 # change dtype to suit the files in your .tab file #
 tokenProps = scipy.genfromtxt(tokenPropsFile,
                               delimiter='\t',names=True,
-                              dtype="i4,f4,f4,S50,S50,i2,i2,i2,S10,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,i4,>i4,i4,i4")
+                              dtype="i4,f4,f4,S50,S50,i2,i2,i2,S10,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,i4,>i4,i4,i4,S4,f8")
 # ... and temporarily save as cpickle archive to satisfy the way I programmed the convenience function loadBookMEGWithAudio (it expects to find the same info in a C-pickle file, and so doesn't need to know about number and type of fields)
 tokenPropsPickle = tokenPropsFile+'.cpk'
 pickle.dump(tokenProps, open(tokenPropsPickle, 'wb'))
@@ -343,19 +343,24 @@ d1mwordEpochs = epochedSignalData[wordTrialsBool & maintTrialsBool & inDataset &
 d2mwordEpochs = epochedSignalData[wordTrialsBool & maintTrialsBool & inDataset & d2TrialsBool]
 d3mwordEpochs = epochedSignalData[wordTrialsBool & maintTrialsBool & inDataset & d3TrialsBool]
 #wordFeatures = tokenProps[wordTrialsBool & parsedTrialsBool & inDataset]
-mwordEpochs = epochedSignalData[wordTrialsBool & maintTrialsBool & inDataset]
-mwordFeatures = tokenProps[wordTrialsBool & maintTrialsBool & inDataset]
+mwordEpochs = epochedSignalData[wordTrialsBool & parsedTrialsBool & maintTrialsBool & inDataset]
+mwordFeatures = tokenProps[wordTrialsBool & parsedTrialsBool & maintTrialsBool & inDataset]
 #d1wordFeatures = tokenProps[wordTrialsBool & d1TrialsBool & inDataset]
 #d2wordFeatures = tokenProps[wordTrialsBool & d2TrialsBool & inDataset]
 #d3wordFeatures = tokenProps[wordTrialsBool & d3TrialsBool & inDataset]
 
 myFeatures = mwordFeatures[featureName]
+#print 'isnan:', tokenProps[numpy.where(numpy.isnan(tokenProps[wordTrialsBool & parsedTrialsBool & maintTrialsBool & inDataset][featureName]))]['asrToken']
+#print 'isnan:', numpy.where(numpy.isnan(myFeatures))
 myOrder = numpy.argsort(myFeatures.ravel())
 myFeatures = myFeatures[myOrder] #sort the features
 mwordEpochs = mwordEpochs[myOrder] #sort the epochs based on associated feature values
 
 myFeatures = myFeatures[:len(myFeatures)/coherence_step * coherence_step] #chop off extra epochs
+#sys.stderr.write(str(myFeatures[:12])+'\n')
 myMeanFeatures = numpy.mean(myFeatures.reshape(-1,coherence_step), axis=1) #group features by coherenced epochs
+#sys.stderr.write(str(myMeanFeatures[:3])+'\n')
+#print 'myMeanFeatures:',myMeanFeatures[-10:]
 
 #COHERENCE ANALYSIS
 #freq_decomp = 'wavelet'
@@ -394,7 +399,7 @@ mcon = numpy.mean(mwcon,axis=0)
 msimplea = numpy.empty((mwcon.shape[0],len(cwt_frequencies)))
 msimple = numpy.empty((mwcon.shape[0],len(cwt_frequencies)))
 
-#wordEpochs x chans x chans x freqs x timeSamples
+# wordEpochs x chans x chans x freqs x timeSamples
 
 for i in range(msimple.shape[0]):
   for fi in range(msimple.shape[1]):
@@ -407,7 +412,19 @@ if plusminus != 0:
 else:
   msimple = msimplea
 
+#print 'msimplea:',msimplea.shape
+#print 'msimple:',msimple.shape # epochs x freqs
+#print 'msimplea sample:',msimplea[0][:10]
+#print 'msimple sample:',msimple[0][:10]
+
 msimple = msimple.transpose() # freqs x epochs
+
+#print 'myMeanFeatures:',myMeanFeatures.shape, 'msimple:',msimple.shape
+#print 'myMeanFeatures sample:',myMeanFeatures[:10],'msimple sample:',msimple[0][:10]
+#print 'myMeanFeatures sample:',myMeanFeatures[-10:],'msimple sample:',msimple[0][-10:]
+#
+#print 'isnan:', myMeanFeatures[numpy.isnan(myMeanFeatures)]
+#print 'finite shape:', myMeanFeatures[numpy.isfinite(myMeanFeatures)].shape
 
 if DEV:
   for fi in range(msimple.shape[0]):

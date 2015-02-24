@@ -28,7 +28,7 @@ for i,l in enumerate(newcolFile):
     word = l.strip().split()
     if '-' == word[1]:
         newcol[-1][1] = newcol[-1][1] + word[1] + newcolFile[i+1].strip().split()[1] #build up hyphenated word
-        newcol[-1][0] = newcol[-1][0] + word[0] #sum surprisal over all hyphenated components
+        newcol[-1][0] = str(float(newcol[-1][0]) + float(word[0])) #sum surprisal over all hyphenated components
         SKIP = 1
         continue
     #ensure similar segmentation to the table
