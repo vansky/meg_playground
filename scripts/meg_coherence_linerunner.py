@@ -5,6 +5,7 @@
 # =======
 
 DEV = True # if True: analyze the dev set; if False: analyze the test set ;; DEV is defined on a sentence level using a stepsize of N ;; TEST is the complement of DEV
+DEVTEST = False #if True: use full dataset;
 devsizerecip = 3 # the reciprocal of the dev size, so devsizerecip = 3 means the dev set is 1/3 and the test set is 2/3
 CWTCYCLEPARAM = 2 # an int parameter to control the temporal/freq resolution of the wavelet decomposition; 2 is good freq resolution, 7 is good temporal resolution
 SAVEDATA = False #Take the time to write the coherence data to disk
@@ -20,8 +21,8 @@ channelLabels = ['MEG0132','MEG1712']
 # GOODFREQS = the frequencies to significance test for
 GOODFREQS = [10]
 
-# logFreq_ANC     bigramLogProbBack_COCA  trigramLogProbBack_COCA surprisal2back_COCA
-featureName = 'totsurp'
+# logFreq_ANC     bigramLogProbBack_COCA  trigramLogProbBack_COCA surprisal2back_COCA totsurp sentenceSerial
+featureName = 'trigramLogProbBack_COCA'
 
 
 #GOODFREQS = [6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46]
@@ -30,7 +31,7 @@ featureName = 'totsurp'
 plusminus = 2
 NJOBS = 20 #dignam has 24 processors
 fmin = 4 #minimum frequency of interest (wavelet); 4
-fmax = 50 #maximum frequency of interest (wavelet); 50
+fmax = 20 #maximum frequency of interest (wavelet); 50
 fstep = 1 #stepsize to get from fmin to fmax
 tminsec = 0 #time start to calculate significance over (in seconds)
 tmaxsec = 0.5 #time end to calculate significance over (in seconds)
@@ -48,6 +49,8 @@ tmax = int(tmaxsec*samplingrate + samplingrate)
 print str(channelLabels)
 if DEV:
   print ' Using DEV'
+elif DEVTEST:
+  print ' Using full dataset'
 else:
   print ' Using TEST'
 print ' Plus/Minus:', str(plusminus), 'Coherence group size:', str(coherence_step)
@@ -229,7 +232,7 @@ def run_ttest(wordesfreqtimes,goodcols,goodfreq):
 # =============
 
 #choose a file - I found participant V to be pretty good, and 0.01 to 50Hz filter is pretty conservative #
-(megFileTag1, megFile1) = ('V_TSSS_0.01-50Hz_@125', '../MEG_data/v_hod_allRuns_tsss_audiobookPrepro_stPad1_lp50_resamp125_frac10ICAed.set')#_hp0.010000.set')
+(megFileTag1, megFile1) = ('V_TSSS_0.01-50Hz_@125', '../MEG_data/v_hod_allRuns_tsss_audiobookPrepro_stPad1_lp50_resamp125_frac10ICAed_hp0.010000.set')
 (megFileTag2, megFile2) = ('A_TSSS_0.01-50Hz_@125', '../MEG_data/aud_hofd_a_allRuns_tsss_audiobookPrepro_stPad1_lp50_resamp125_frac10ICAed_hp0.010000.set')
 (megFileTag3, megFile3) = ('C_TSSS_0.01-50Hz_@125', '../MEG_data/aud_hofd_c_allRuns_tsss_audiobookPrepro_stPad1_lp50_resamp125_frac10ICAed_hp0.010000.set')
 
@@ -237,13 +240,15 @@ def run_ttest(wordesfreqtimes,goodcols,goodfreq):
 #to get the V5.tab:
 #  python ../scripts/buildtab.py hod_JoeTimes_LoadsaFeaturesV3.tab hod.wsj02to21-comparativized-gcg15-1671-4sm.fullberk.parsed.gcgbadwords > hod_JoeTimes_LoadsaFeaturesV4.tab
 #  python ../scripts/expandtab.py hod_JoeTimes_LoadsaFeaturesV4.tab > hod_JoeTimes_LoadsaFeaturesV5.tab
-tokenPropsFile = '../MEG_data/hod_JoeTimes_LoadsaFeaturesV7.tab'
+#  python ../scripts/addparserops.py hod_JoeTimes_LoadsaFeaturesV5.tab hod.wsj02to21-comparativized-gcg15-1671-4sm.fullberk.parsed.gcgparseops > hod_JoeTimes_LoadsaFeaturesV6.tab
+#  python ../scripts/addtotsurp.py hod_JoeTimes_LoadsaFeaturesV6.tab hod.totsurp > hod_JoeTimes_LoadsaFeaturesV7.tab
+tokenPropsFile = '../MEG_data/hod_JoeTimes_LoadsaFeaturesV8.tab'
 
 # LOAD WORD PROPS
 # change dtype to suit the files in your .tab file #
 tokenProps = scipy.genfromtxt(tokenPropsFile,
                               delimiter='\t',names=True,
-                              dtype="i4,f4,f4,S50,S50,i2,i2,i2,S10,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,i4,>i4,i4,i4,S4,f8")
+                              dtype="i4,f4,f4,S50,S50,i2,i2,i2,S10,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,i4,>i4,i4,i4,S4,f8,f8")
 # ... and temporarily save as cpickle archive to satisfy the way I programmed the convenience function loadBookMEGWithAudio (it expects to find the same info in a C-pickle file, and so doesn't need to know about number and type of fields)
 tokenPropsPickle = tokenPropsFile+'.cpk'
 pickle.dump(tokenProps, open(tokenPropsPickle, 'wb'))
@@ -301,6 +306,8 @@ testTrialsBool = numpy.array([s not in devitems and s in validsents for s in tok
 
 if DEV:
   inDataset = devTrialsBool
+elif DEVTEST:
+  inDataset = numpy.ones((max(tokenProps['sentid']),1), dtype=bool)
 else:
   inDataset = testTrialsBool
 

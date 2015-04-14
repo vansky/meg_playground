@@ -30,7 +30,8 @@ GOODFREQS3 = [10]
 DEPTH = True #test depth or something else?
 TEST2 = True
 TEST3 = True
-OPTIMAL = True
+OPTIMAL = False #test u-values of chosen freqs to determine the best freq
+SCAN = True #scan all freqs instead of just the specified ones
 
 if not DEV:
   if DRAW:
@@ -39,12 +40,15 @@ if not DEV:
   if OPTIMAL:
     print 'No cheating allowed; optimal search suppressed'
     OPTIMAL = False
+  if SCAN:
+    print 'No cheating allowed; scanning suppressed'
+    SCAN = False
 
 #coherence analysis settings
 plusminus = 2
 NJOBS = 20 #dignam has 24 processors
 fmin = 4 #minimum frequency of interest (wavelet); 4
-fmax = 50 #maximum frequency of interest (wavelet); 50
+fmax = 20 #maximum frequency of interest (wavelet); 50
 fstep = 1 #stepsize to get from fmin to fmax
 tminsec = 0 #time start to calculate significance over (in seconds)
 tmaxsec = 0.5 #time end to calculate significance over (in seconds)
@@ -70,9 +74,10 @@ if DEV:
 else:
   print ' Using TEST'
 print ' Plus/Minus:', str(plusminus), 'Coherence group size:', str(coherence_step)
+if SCAN:
+  print ' Scanning all frequencies'
 if OPTIMAL:
   print ' Using optimal search based on u-test p-values'
-
   
 # Imports
 # =======
@@ -89,6 +94,8 @@ import pandas as pd
 import os
 #import pylab
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
+from matplotlib import ticker
 import sklearn
 from sklearn import preprocessing
 import sklearn.linear_model
@@ -106,10 +113,21 @@ from mne.connectivity import spectral_connectivity, seed_target_indices
 from protoMEEGutils import *
 import protoSpectralWinFFTMapper as specfft
 
-#GOODFREQS = numpy.arange(6,47)
-GOODFREQS = numpy.array(GOODFREQS)
-GOODFREQS2 = numpy.array(GOODFREQS2)
-GOODFREQS3 = numpy.array(GOODFREQS3)
+if SCAN:
+  GOODFREQS = numpy.arange(fmin,fmax)
+  GOODFREQS2 = numpy.arange(fmin,fmax)
+  GOODFREQS3 = numpy.arange(fmin,fmax)
+else:
+  GOODFREQS = numpy.array(GOODFREQS)
+  GOODFREQS2 = numpy.array(GOODFREQS2)
+  GOODFREQS3 = numpy.array(GOODFREQS3)
+
+
+#LaTeX fonts
+#plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+## for Palatino and other serif fonts use:
+#rc('font',**{'family':'serif','serif':['Palatino']})
+#plt.rc('text', usetex=True)
 
 # Definitions
 # ===========
@@ -125,6 +143,34 @@ def mynormalise(A):
   A = scipy.stats.zscore(A)
   A[numpy.isnan(A)] = 0
   return A
+
+def mycmap(data,ugraph):
+  #overlay ugraph on data as inverted alpha level
+  #cdict = {'red': [(0.0, 0.0, 0.0),
+  #                 (0.5, 1.0, 1.0),
+  #                 (1.0, 1.0, 1.0)],
+  #         'green': [(0.0, 0.0, 0.0),
+  #                   (0.5, 1.0, 1.0),
+  #                   (1.0, 0.0, 0.0)],
+  #         'blue': [(0.0, 1.0, 1.0),
+  #                  (0.5, 1.0, 1.0),
+  #                  (1.0, 0.0, 0.0)],
+  #         'alpha': [(0.0, 1.0, 1.0),
+  #                   (0.5, 1.0, 1.0),
+  #                   (0.0, 1.0, 1.0)]}
+  #my_cmap = LinearSegmentedColormap('my_colormap',cdict,256)
+  #plt.register_cmap(cmap=my_cmap)
+  #                  
+  #tmp = plt.cm.my_cmap(data)
+  small = numpy.min(data.ravel())
+  big = numpy.max(data.ravel())
+  tmp = plt.cm.jet((data - small)/(big-small)) #scale data 0-1 first, to see full range of color
+  for i in xrange(tmp.shape[0]):
+    for j in xrange(tmp.shape[1]):
+      #newmap[i,j] = tmp[i,j]
+      #newmap[i,j,3] = 1-0.9*min(1,ugraph[i])
+      tmp[i,j,3] = 1-min(0.8,7*ugraph[i])
+  return tmp
 
 #def dynpool(conmat, numEpochs):
 #  #conmat has the following shape: wordEpochs x chans x chans x freqs x timeSamples
@@ -142,8 +188,8 @@ def draw_con_matrix(conmat, fnamecode, vmin=None, vmax=None, method = 'coherence
 
   fig, axes = plt.subplots(n_rows, n_cols, sharex=True, sharey=True, figsize=(15,15))
   plt.suptitle('Between sensor connectivity (%s)' % (method) )
-  for i in range(n_rows):
-    for j in range(i+1):
+  for i in xrange(n_rows):
+    for j in xrange(i+1):
       if i == j:
         axes[i, j].set_axis_off()
         continue
@@ -169,6 +215,93 @@ def draw_con_matrix(conmat, fnamecode, vmin=None, vmax=None, method = 'coherence
   else:
     plt.savefig('graphics/coh_%s_test.png' % (fnamecode) )
 
+def draw_single_con_matrix(conmat, fnamecode, vmin=None, vmax=None, method = 'coherence'):
+  #draws the connectivity matrix after overlaying an alpha filter based on the p-values in the ugraph
+  if vmin == None:
+    vmin = min(conmat.ravel())
+  if vmax == None:
+    vmax = max(conmat.ravel())
+
+  n_rows, n_cols = conmat.shape[:2]
+
+  #fig, axes = plt.subplots(n_rows, n_cols, sharex=True, sharey=True, figsize=(15,15))
+  #plt.rc('text', usetex=True)
+  #plt.rc('font', family='serif')
+  
+  fig, ax = plt.subplots(figsize=(4.,3.5))
+  im = ax.imshow(conmat[1,0], vmin = vmin, vmax = vmax, aspect = 'auto')
+  #plt.suptitle('Sensor coherence')
+  #for i in range(n_rows):
+  #  for j in range(i+1):
+  #    if i == j:
+  #      axes[i, j].set_axis_off()
+  #      continue
+  #
+  #    cax = axes[i, j].imshow(conmat[i, j, :], vmin=vmin, vmax = vmax, aspect = 'auto') #, interpolation='nearest')
+  if epochStart < 0:
+    ax.axvline(x=epochStart *-1 * samplingRate, c='black', lw=1)
+  #else: onset isn't on graph
+
+  #ax.set_ylabel(names[1])
+  ax.set_yticks(numpy.arange(len(cwt_frequencies))[::6])
+  ax.set_yticklabels(cwt_frequencies[::6])
+  #ax.set_title(names[1])
+  #ax.set_xlabel(names[0])
+  ax.set_xticks(numpy.arange(0.0,conmat.shape[3],62.5))
+  ax.set_xticklabels(numpy.arange(epochStart,epochEnd,(epochEnd-epochStart)/(conmat.shape[3]/62.5)))
+  ax.set_ylim([0.0, conmat.shape[2]-1])
+  plt.colorbar(im)
+  if DEV:
+    plt.savefig('graphics/coh_%s_dev.png' % (fnamecode) )
+  else:
+    plt.savefig('graphics/coh_%s_test.png' % (fnamecode) )
+
+def draw_trans_con_matrix(conmat, ugraph, fnamecode, vmin=None, vmax=None, method = 'coherence'):
+  #draws the connectivity matrix after overlaying an alpha filter based on the p-values in the ugraph
+  if vmin == None:
+    vmin = min(conmat.ravel())
+  if vmax == None:
+    vmax = max(conmat.ravel())
+
+  n_rows, n_cols = conmat.shape[:2]
+
+  #fig, axes = plt.subplots(n_rows, n_cols, sharex=True, sharey=True, figsize=(15,15))
+  #plt.rc('text', usetex=True)
+  #plt.rc('font', family='serif')
+  
+  fig, ax = plt.subplots(figsize=(3.,3.))
+  im = ax.imshow(mycmap(conmat[1,0],ugraph), vmin = vmin, vmax = vmax, aspect = 'auto')
+  #plt.suptitle('Sensor coherence')
+  #for i in range(n_rows):
+  #  for j in range(i+1):
+  #    if i == j:
+  #      axes[i, j].set_axis_off()
+  #      continue
+  #
+  #    cax = axes[i, j].imshow(conmat[i, j, :], vmin=vmin, vmax = vmax, aspect = 'auto') #, interpolation='nearest')
+  if epochStart < 0:
+    ax.axvline(x=epochStart *-1 * samplingRate, c='black', lw=1)
+  #else: onset isn't on graph
+
+  #ax.set_ylabel('Frequency (Hz)')
+  ax.set_yticks(numpy.arange(len(cwt_frequencies))[::3])
+  ax.set_yticklabels(cwt_frequencies[::3])
+  #ax.set_title(names[1])
+  #ax.set_xlabel('Time (s)')
+  ax.set_xticks(numpy.arange(0.0,conmat.shape[3],62.5))
+  ax.set_xticklabels(numpy.arange(epochStart,epochEnd,(epochEnd-epochStart)/(conmat.shape[3]/62.5)))
+  ax.set_ylim([0.0, conmat.shape[2]-1])
+  
+  cb = plt.colorbar(im, format='%1.2g')
+  tick_locator = ticker.MaxNLocator(nbins=7)
+  cb.locator = tick_locator
+  cb.update_ticks()
+  if DEV:
+    plt.savefig('graphics/coh_%s_dev.png' % (fnamecode) )
+  else:
+    plt.savefig('graphics/coh_%s_test.png' % (fnamecode) )
+
+    
 def draw_tgraph(data, fnamecode, vmin=None, vmax=None, valtype='t'):
   data = data.reshape(-1,1)
   #draws the tgraph
@@ -199,7 +332,7 @@ def word_connectivity(wordEpochs,indices,step=2):
   # this array is wordEpochs x chans x chans x freqs x timeSamples
   print 'wordconnectivity',wordconnectivity.shape
   total = wordEpochs.shape[0]-wordEpochs.shape[0]%step
-  for i in range(0,total/step):
+  for i in xrange(0,total/step):
     word = wordEpochs[step*i:step*(i+1)]
     if i == 0:
       print 'word',word.shape
@@ -220,8 +353,8 @@ def word_connectivity(wordEpochs,indices,step=2):
 
 def find_pairs(num):
   pairs = []
-  for i in range(num-1):
-    for j in range(i+1,num):
+  for i in xrange(num-1):
+    for j in xrange(i+1,num):
       pairs.append( (i,j) )
   return(pairs)
 
@@ -253,7 +386,7 @@ def run_ttest(wordesfreqtimes,goodcols,goodfreq):
 # =============
 
 #choose a file - I found participant V to be pretty good, and 0.01 to 50Hz filter is pretty conservative #
-(megFileTag1, megFile1) = ('V_TSSS_0.01-50Hz_@125', '../MEG_data/v_hod_allRuns_tsss_audiobookPrepro_stPad1_lp50_resamp125_frac10ICAed.set')#_hp0.010000.set')
+(megFileTag1, megFile1) = ('V_TSSS_0.01-50Hz_@125', '../MEG_data/v_hod_allRuns_tsss_audiobookPrepro_stPad1_lp50_resamp125_frac10ICAed_hp0.010000.set')
 (megFileTag2, megFile2) = ('A_TSSS_0.01-50Hz_@125', '../MEG_data/aud_hofd_a_allRuns_tsss_audiobookPrepro_stPad1_lp50_resamp125_frac10ICAed_hp0.010000.set')
 (megFileTag3, megFile3) = ('C_TSSS_0.01-50Hz_@125', '../MEG_data/aud_hofd_c_allRuns_tsss_audiobookPrepro_stPad1_lp50_resamp125_frac10ICAed_hp0.010000.set')
 
@@ -274,7 +407,7 @@ tokenProps = scipy.genfromtxt(tokenPropsFile,
 tokenPropsPickle = tokenPropsFile+'.cpk'
 pickle.dump(tokenProps, open(tokenPropsPickle, 'wb'))
 
-triggersOfInterest=['s%d' % i for i in range(1,10)]
+triggersOfInterest=['s%d' % i for i in xrange(1,10)]
 refEvent = 'onTime' #,'offTime']
 # guess an epoch of -0.5 to +1s should be enough #
 #epochStart = -1; # stimulus ref event
@@ -338,7 +471,7 @@ avefit_dict = {}
 freqsY = None
 trainX = None
 
-channelsOfInterest = [i for i in range(len(metaData1.chanlocs)) if metaData1.chanlocs[i].labels in channelLabels]
+channelsOfInterest = [i for i in xrange(len(metaData1.chanlocs)) if metaData1.chanlocs[i].labels in channelLabels]
 
 #for channelix in chanixes: 
 #print 'Compiling data from channel:',channelix
@@ -390,6 +523,12 @@ else:
   testEpochs2 = conjEpochs
   testEpochs3 = None
 
+if FUDGE:
+  testEpochs1 = testEpochs1[:40]
+  testEpochs2 = testEpochs2[:40]
+  if TEST3:
+    testEpochs3 = testEpochs3[:40]
+  
 #COHERENCE ANALYSIS
 #freq_decomp = 'wavelet'
 
@@ -459,27 +598,27 @@ if TEST3:
 #print numpy.mean(d1wcon[0,1,0,0])
 #print numpy.mean(d1wcon[0,1,1,0])
 
-for i in range(d1simple.shape[0]):
-  for fi in range(d1simple.shape[1]):
+for i in xrange(d1simple.shape[0]):
+  for fi in xrange(d1simple.shape[1]):
     d1simplea[i,fi] = numpy.mean(d1wcon[i,1,0,fi,tmin:tmax])
-for i in range(d2simple.shape[0]):
-  for fi in range(d2simple.shape[1]):
+for i in xrange(d2simple.shape[0]):
+  for fi in xrange(d2simple.shape[1]):
     d2simplea[i,fi] = numpy.mean(d2wcon[i,1,0,fi,tmin:tmax])
 if TEST3:
-  for i in range(d3simple.shape[0]):
-    for fi in range(d3simple.shape[1]):
+  for i in xrange(d3simple.shape[0]):
+    for fi in xrange(d3simple.shape[1]):
       d3simplea[i,fi] = numpy.mean(d3wcon[i,1,0,fi,tmin:tmax])
 if plusminus != 0:
   #average over multiple frequencies
-  for i in range(d1simple.shape[0]):
-    for fi in range(d1simple.shape[1]):
+  for i in xrange(d1simple.shape[0]):
+    for fi in xrange(d1simple.shape[1]):
       d1simple[i,fi] = numpy.mean(d1simplea[i,max(0,fi-plusminus):min(d1simple.shape[1],fi+plusminus+1)])
-  for i in range(d2simple.shape[0]):
-    for fi in range(d2simple.shape[1]):
+  for i in xrange(d2simple.shape[0]):
+    for fi in xrange(d2simple.shape[1]):
       d2simple[i,fi] = numpy.mean(d2simplea[i,max(0,fi-plusminus):min(d2simple.shape[1],fi+plusminus+1)])
   if TEST3:
-    for i in range(d3simple.shape[0]):
-      for fi in range(d3simple.shape[1]):
+    for i in xrange(d3simple.shape[0]):
+      for fi in xrange(d3simple.shape[1]):
         d3simple[i,fi] = numpy.mean(d3simplea[i,max(0,fi-plusminus):min(d3simple.shape[1],fi+plusminus+1)])
 else:
   d1simple = d1simplea
@@ -510,7 +649,7 @@ if SAVEDATA:
       pickle.dump(conpkg,f)
 
 if DEV:
-  for fi in range(len(cwt_frequencies)):
+  for fi in xrange(len(cwt_frequencies)):
     tgraph2[fi] = abs(scipy.stats.f_oneway(d1simple[:,fi],d2simple[:,fi])[0])
     ugraph2[fi] = abs(scipy.stats.mannwhitneyu(d1simple[:,fi],d2simple[:,fi])[1])
     if TEST3:
@@ -520,6 +659,7 @@ if OPTIMAL:
   if TEST2:
     for col in numpy.where(ugraph2 < 0.05)[0].ravel():
       print 'd2-d1:', cwt_frequencies[col], 'Hz:', numpy.mean(d2simple,axis=0)[col],'-', numpy.mean(d1simple,axis=0)[col],'p=', scipy.stats.f_oneway(d1simple[:,col],d2simple[:,col]), 'u=',scipy.stats.mannwhitneyu(d1simple[:,col],d2simple[:,col])
+      print 'variance:',numpy.var(numpy.concatenate((d1simple[:,col],d2simple[:,col]),axis=0)), 'stddev:',numpy.std(numpy.concatenate((d1simple[:,col],d2simple[:,col]),axis=0)), 'stddevA:',numpy.std(d2simple[:,col]), 'stddevB:',numpy.std(d1simple[:,col])
   if TEST3:
     for col in numpy.where(ugraph3 < 0.05)[0].ravel():
       print 'd3-d2:', cwt_frequencies[col], 'Hz:', numpy.mean(d3simple,axis=0)[col],'-', numpy.mean(d2simple,axis=0)[col],'p=', scipy.stats.f_oneway(d2simple[:,col],d3simple[:,col]),'u=', scipy.stats.mannwhitneyu(d2simple[:,col],d3simple[:,col])
@@ -528,6 +668,7 @@ else:
     if TEST2:
       if DEV or (not DEV and col in GOODFREQS2-fmin):
         print 'd2-d1:', cwt_frequencies[col], 'Hz:', numpy.mean(d2simple,axis=0)[col],'-', numpy.mean(d1simple,axis=0)[col],'p=', scipy.stats.f_oneway(d1simple[:,col],d2simple[:,col]), 'u=',scipy.stats.mannwhitneyu(d1simple[:,col],d2simple[:,col])
+        print 'variance:',numpy.var(numpy.concatenate((d1simple[:,col],d2simple[:,col]),axis=0)), 'stddev:',numpy.std(numpy.concatenate((d1simple[:,col],d2simple[:,col]),axis=0)), 'stddevA:',numpy.std(d2simple[:,col]), 'stddevB:',numpy.std(d1simple[:,col])
         if CHECK_NORMALITY:
           scipy.stats.probplot(d1simple[:,col], dist="norm", plot=plt)
           plt.savefig('graphics/norm1.png')
@@ -538,6 +679,7 @@ else:
     if TEST3:
       if DEV or (not DEV and col in GOODFREQS3-fmin):
         print 'd3-d2:', cwt_frequencies[col], 'Hz:', numpy.mean(d3simple,axis=0)[col],'-', numpy.mean(d2simple,axis=0)[col],'p=', scipy.stats.f_oneway(d2simple[:,col],d3simple[:,col]),'u=', scipy.stats.mannwhitneyu(d2simple[:,col],d3simple[:,col])
+        print 'variance:',numpy.var(numpy.concatenate((d1simple[:,col],d2simple[:,col]),axis=0)), 'stddev:',numpy.std(numpy.concatenate((d1simple[:,col],d2simple[:,col]),axis=0))
         if CHECK_NORMALITY:
           scipy.stats.probplot(d3simple[:,col], dist="norm", plot=plt)
           plt.savefig('graphics/norm3.png')
@@ -650,10 +792,12 @@ if DRAW:
   namemod = str(plusminus)+'_'+str(channelNumbers[0])+'-'+str(channelNumbers[1])
   if DEV:
     if TEST3:
-      draw_con_matrix(maintcon3, 'maintenance3'+namemod, vmin, vmax)
+      draw_single_con_matrix(maintcon3, 'maintenance3'+namemod, vmin, vmax)
+      draw_trans_con_matrix(maintcon3, ugraph3, 'transmaintenance3'+namemod, vmin, vmax)
       draw_tgraph(tgraph3, 'tgraph3'+namemod, 0, None, 't')
       draw_tgraph(ugraph3, 'ugraph3'+namemod, None, 0.05, 'u')
-    draw_con_matrix(maintcon2, 'maintenance2'+namemod, vmin, vmax)
+    draw_single_con_matrix(maintcon2, 'maintenance2'+namemod, vmin, vmax)
+    draw_trans_con_matrix(maintcon2, ugraph2, 'transmaintenance2'+namemod, vmin, vmax)
     draw_tgraph(tgraph2, 'tgraph2'+namemod, 0, None, 't')
     draw_tgraph(ugraph2, 'ugraph2'+namemod, None, 0.05, 'u')
   #run_ttest((d1wcon,d2wcon,d3wcon),Tchannels,GOODFREQ)
