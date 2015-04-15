@@ -15,13 +15,12 @@ FUDGE = False # this factor is used to enable and mark dubious code, which can b
 DRAW = True #Whether or not to draw the coherence connectivity matrix
 CHECK_NORMALITY = False #Print normality plots
 
-channelLabels = ['MEG0122', 'MEG0132', 'MEG1512', 'MEG1522', 'MEG1532', 'MEG1642', 'MEG1722', 'MEG1712'] #left-side longitudinal pairings
+#channelLabels = ['MEG0122', 'MEG0132', 'MEG1512', 'MEG1522', 'MEG1532', 'MEG1642', 'MEG1722', 'MEG1712'] #left-side longitudinal pairings
 #channelLabels = ['MEG1712', 'MEG1732', 'MEG1932', 'MEG1922', 'MEG2132', 'MEG2342', 'MEG2512', 'MEG2532'] #posterior left-right longitudinal pairings
-#channelLabels = ['MEG0133','MEG1743']
-#channelLabels = ['MEG0132','MEG1712']
-#channelLabels = ['MEG1732','MEG2543']
-#channelLabels = ['MEG0133','MEG1542']
-#channelLabels = ['MEG0122','MEG0132','MEG0223','MEG1513','MEG1712']
+channelLabels = ['MEG0122','MEG1512']
+#channelLabels = ['MEG0132','MEG1512']
+#channelLabels = ['MEG1642','MEG1722']
+
 # GOODFREQS = the frequencies to significance test for
 GOODFREQS = [10]
 GOODFREQS2 = [10]
@@ -29,8 +28,9 @@ GOODFREQS3 = [10]
 
 #GOODFREQS = [6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46]
 DEPTH = True #test depth or something else?
+TESTM = False
 TEST2 = True
-TEST3 = True
+GRID = False #plot multi-sensor coherence grid
 OPTIMAL = True #test u-values of chosen freqs to determine the best freq
 SCAN = True #scan all freqs instead of just the specified ones
 
@@ -44,6 +44,9 @@ if not DEV:
   if SCAN:
     print 'No cheating allowed; scanning suppressed'
     SCAN = False
+  if GRID:
+    print 'No cheating allowed; grid suppressed'
+    GRID = False
 
 #coherence analysis settings
 plusminus = 2
@@ -57,7 +60,7 @@ samplingrate = 125
 
 coherence_step = 4 #number of epochs to average over when calculating coherence
 
-#if DRAW and (not TEST3 or not TEST2):
+#if DRAW and (not TEST2 or not TESTM):
 #  print "Can't draw if depth 2 and depth 3 not calculated"
 #  raise
 
@@ -79,6 +82,8 @@ if SCAN:
   print ' Scanning all frequencies'
 if OPTIMAL:
   print ' Using optimal search based on u-test p-values'
+if GRID:
+  print ' Plotting multi-sensor coherence grid'
   
 # Imports
 # =======
@@ -497,8 +502,9 @@ mmwordEpochs = epochedSignalData[wordTrialsBool & mmTrialsBool & inDataset]
 
 if DEPTH:
   testEpochs1 = m1wordEpochs
-  testEpochsm = mmwordEpochs
-  if TEST3:
+  if TESTM:
+    testEpochsm = mmwordEpochs
+  if TEST2:
     testEpochs2 = m2wordEpochs
 else:
   raise
@@ -508,8 +514,9 @@ else:
 
 if FUDGE:
   testEpochs1 = testEpochs1[:40]
-  testEpochsm = testEpochsm[:40]
-  if TEST3:
+  if TESTM:
+    testEpochsm = testEpochsm[:40]
+  if TEST2:
     testEpochs2 = testEpochs2[:40]
   
 #COHERENCE ANALYSIS
@@ -542,31 +549,37 @@ print 'Calculating coherence'
 #                                                  cwt_frequencies=cwt_frequencies, cwt_n_cycles=cwt_n_cycles, n_jobs=NJOBS, verbose='WARNING')
 
 print 'testEpochs1',testEpochs1.shape
-print 'testEpochsm',testEpochsm.shape
-if TEST3:
+if TESTM:
+  print 'testEpochsm',testEpochsm.shape
+if TEST2:
   print 'testEpochs2',testEpochs2.shape
 
 m1wcon = word_connectivity(testEpochs1, indices=indices, step = coherence_step)
-mmwcon = word_connectivity(testEpochsm, indices=indices, step = coherence_step)
-if TEST3:
+if TESTM:
+  mmwcon = word_connectivity(testEpochsm, indices=indices, step = coherence_step)
+if TEST2:
   m2wcon = word_connectivity(testEpochs2, indices=indices, step = coherence_step)
 print 'm1wcon',m1wcon.shape
-print 'mmwcon',mmwcon.shape
-if TEST3:
+if TESTM:
+  print 'mmwcon',mmwcon.shape
+if TEST2:
   print 'm2wcon',m2wcon.shape
 
 m1mcon = numpy.mean(m1wcon,axis=0)
-mmmcon = numpy.mean(mmwcon,axis=0)
-if TEST3:
+if TESTM:
+  mmmcon = numpy.mean(mmwcon,axis=0)
+if TEST2:
   m2mcon = numpy.mean(m2wcon,axis=0)
 
 m1simplea = numpy.empty((m1wcon.shape[0],len(cwt_frequencies)))
-m2simplea = numpy.empty((mmwcon.shape[0],len(cwt_frequencies)))
-if TEST3:
+if TESTM:
+  m2simplea = numpy.empty((mmwcon.shape[0],len(cwt_frequencies)))
+if TEST2:
   m3simplea = numpy.empty((m2wcon.shape[0],len(cwt_frequencies)))
 m1simple = numpy.empty((m1wcon.shape[0],len(cwt_frequencies)))
-m2simple = numpy.empty((mmwcon.shape[0],len(cwt_frequencies)))
-if TEST3:
+if TESTM:
+  m2simple = numpy.empty((mmwcon.shape[0],len(cwt_frequencies)))
+if TEST2:
   m3simple = numpy.empty((m2wcon.shape[0],len(cwt_frequencies)))
 
 #wordEpochs x chans x chans x freqs x timeSamples
@@ -584,10 +597,11 @@ if TEST3:
 for i in xrange(m1simple.shape[0]):
   for fi in xrange(m1simple.shape[1]):
     m1simplea[i,fi] = numpy.mean(m1wcon[i,1,0,fi,tmin:tmax])
-for i in xrange(m2simple.shape[0]):
-  for fi in xrange(m2simple.shape[1]):
-    m2simplea[i,fi] = numpy.mean(mmwcon[i,1,0,fi,tmin:tmax])
-if TEST3:
+if TESTM:
+  for i in xrange(m2simple.shape[0]):
+    for fi in xrange(m2simple.shape[1]):
+      m2simplea[i,fi] = numpy.mean(mmwcon[i,1,0,fi,tmin:tmax])
+if TEST2:
   for i in xrange(m3simple.shape[0]):
     for fi in xrange(m3simple.shape[1]):
       m3simplea[i,fi] = numpy.mean(m2wcon[i,1,0,fi,tmin:tmax])
@@ -596,24 +610,26 @@ if plusminus != 0:
   for i in xrange(m1simple.shape[0]):
     for fi in xrange(m1simple.shape[1]):
       m1simple[i,fi] = numpy.mean(m1simplea[i,max(0,fi-plusminus):min(m1simple.shape[1],fi+plusminus+1)])
-  for i in xrange(m2simple.shape[0]):
-    for fi in xrange(m2simple.shape[1]):
-      m2simple[i,fi] = numpy.mean(m2simplea[i,max(0,fi-plusminus):min(m2simple.shape[1],fi+plusminus+1)])
-  if TEST3:
+  if TESTM:
+    for i in xrange(m2simple.shape[0]):
+      for fi in xrange(m2simple.shape[1]):
+        m2simple[i,fi] = numpy.mean(m2simplea[i,max(0,fi-plusminus):min(m2simple.shape[1],fi+plusminus+1)])
+  if TEST2:
     for i in xrange(m3simple.shape[0]):
       for fi in xrange(m3simple.shape[1]):
         m3simple[i,fi] = numpy.mean(m3simplea[i,max(0,fi-plusminus):min(m3simple.shape[1],fi+plusminus+1)])
 else:
   m1simple = m1simplea
-  m2simple = m2simplea
-  if TEST3:
+  if TESTM:
+    m2simple = m2simplea
+  if TEST2:
     m3simple = m3simplea
 
 conpkg = {'conmats':[],'freqs':freqs,'electrodes':channelLabels}
 
 tgraph2 = numpy.empty((len(cwt_frequencies),))
 ugraph2 = numpy.empty((len(cwt_frequencies),))
-if TEST3:
+if TEST2:
   tgraph3 = numpy.empty((len(cwt_frequencies),))
   ugraph3 = numpy.empty((len(cwt_frequencies),))
 
@@ -621,34 +637,36 @@ if SAVEDATA:
   print 'Writing coherence metrics to disk'
 
   conpkg['conmats'] = m1wcon
-  with open(SAVEDIR+'cohm1m.pkl','wb') as f:
+  with open(SAVEDIR+'coh1m.pkl','wb') as f:
     pickle.dump(conpkg,f)
-  conpkg['conmats'] = mmwcon
-  with open(SAVEDIR+'cohm2m.pkl','wb') as f:
-    pickle.dump(conpkg,f)
-  if TEST3:
+  if TESTM:
+    conpkg['conmats'] = mmwcon
+    with open(SAVEDIR+'cohmm.pkl','wb') as f:
+      pickle.dump(conpkg,f)
+  if TEST2:
     conpkg['conmats'] = m2wcon
-    with open(SAVEDIR+'cohm3m.pkl','wb') as f:
+    with open(SAVEDIR+'coh2m.pkl','wb') as f:
       pickle.dump(conpkg,f)
 
 if DEV:
   for fi in xrange(len(cwt_frequencies)):
-    tgraph2[fi] = abs(scipy.stats.f_oneway(m1simple[:,fi],m2simple[:,fi])[0])
-    ugraph2[fi] = abs(scipy.stats.mannwhitneyu(m1simple[:,fi],m2simple[:,fi])[1])
-    if TEST3:
+    if TESTM:
+      tgraph2[fi] = abs(scipy.stats.f_oneway(m1simple[:,fi],m2simple[:,fi])[0])
+      ugraph2[fi] = abs(scipy.stats.mannwhitneyu(m1simple[:,fi],m2simple[:,fi])[1])
+    if TEST2:
       tgraph3[fi] = abs(scipy.stats.f_oneway(m2simple[:,fi],m3simple[:,fi])[0])
       ugraph3[fi] = abs(scipy.stats.mannwhitneyu(m2simple[:,fi],m3simple[:,fi])[1])
 if OPTIMAL:
-  if TEST2:
+  if TESTM:
     for col in numpy.where(ugraph2 < 0.05)[0].ravel():
       print 'm2-m1:', cwt_frequencies[col], 'Hz:', numpy.mean(m2simple,axis=0)[col],'-', numpy.mean(m1simple,axis=0)[col],'p=', scipy.stats.f_oneway(m1simple[:,col],m2simple[:,col]), 'u=',scipy.stats.mannwhitneyu(m1simple[:,col],m2simple[:,col])
       print 'variance:',numpy.var(numpy.concatenate((m1simple[:,col],m2simple[:,col]),axis=0)), 'stddev:',numpy.std(numpy.concatenate((m1simple[:,col],m2simple[:,col]),axis=0)), 'stddevA:',numpy.std(m2simple[:,col]), 'stddevB:',numpy.std(m1simple[:,col])
-  if TEST3:
+  if TEST2:
     for col in numpy.where(ugraph3 < 0.05)[0].ravel():
       print 'm3-m2:', cwt_frequencies[col], 'Hz:', numpy.mean(m3simple,axis=0)[col],'-', numpy.mean(m2simple,axis=0)[col],'p=', scipy.stats.f_oneway(m2simple[:,col],m3simple[:,col]),'u=', scipy.stats.mannwhitneyu(m2simple[:,col],m3simple[:,col])
 else:
   for col in GOODFREQS-fmin:
-    if TEST2:
+    if TESTM:
       if DEV or (not DEV and col in GOODFREQS2-fmin):
         print 'm2-m1:', cwt_frequencies[col], 'Hz:', numpy.mean(m2simple,axis=0)[col],'-', numpy.mean(m1simple,axis=0)[col],'p=', scipy.stats.f_oneway(m1simple[:,col],m2simple[:,col]), 'u=',scipy.stats.mannwhitneyu(m1simple[:,col],m2simple[:,col])
         print 'variance:',numpy.var(numpy.concatenate((m1simple[:,col],m2simple[:,col]),axis=0)), 'stddev:',numpy.std(numpy.concatenate((m1simple[:,col],m2simple[:,col]),axis=0)), 'stddevA:',numpy.std(m2simple[:,col]), 'stddevB:',numpy.std(m1simple[:,col])
@@ -659,7 +677,7 @@ else:
           scipy.stats.probplot(m2simple[:,col], dist="norm", plot=plt)
           plt.savefig('graphics/norm2.png')
           plt.close("all")
-    if TEST3:
+    if TEST2:
       if DEV or (not DEV and col in GOODFREQS3-fmin):
         print 'm3-m2:', cwt_frequencies[col], 'Hz:', numpy.mean(m3simple,axis=0)[col],'-', numpy.mean(m2simple,axis=0)[col],'p=', scipy.stats.f_oneway(m2simple[:,col],m3simple[:,col]),'u=', scipy.stats.mannwhitneyu(m2simple[:,col],m3simple[:,col])
         print 'variance:',numpy.var(numpy.concatenate((m1simple[:,col],m2simple[:,col]),axis=0)), 'stddev:',numpy.std(numpy.concatenate((m1simple[:,col],m2simple[:,col]),axis=0))
@@ -737,19 +755,27 @@ else:
 #    pickle.dump(conpkg,f)
 
 if DRAW:
-  if TEST3:
+  if TEST2:
     maintcon3 = m2mcon - m1mcon
-  maintcon2 = mmmcon - m1mcon
+  if TESTM:
+    maintcon2 = mmmcon - m1mcon
 
   vmin = None
   vmax = None
   
   print 'Computing means'
   #+/- 2 Hz, 0-.5s, 25 & 40 Hz
-  third = int(maintcon2.shape[3]/3.)
+  if TESTM:
+    third = int(maintcon2.shape[3]/3.)
+  elif TEST2:
+    third = int(maintcon3.shape[3]/3.)
   sixth = int(third * .5)
   twelfth = int(sixth * .5)
-  print maintcon2.shape
+  if TESTM:
+    print maintcon2.shape
+  if TEST2:
+    print maintcon3.shape
+    
   #for findex,freq in zip(findices,GOODFREQS):
     #print 'index:', findex, 'freq:',freq
     #print str(freq)+':', numpy.mean(maintcon[1,0,findex-plusminus:findex+plusminus+1,third-sixth:third+sixth],axis=1)
@@ -774,15 +800,18 @@ if DRAW:
   #draw_con_matrix(storcon, 'storage', vmin, vmax)
   namemod = str(plusminus)+'_'+str(channelNumbers[0])+'-'+str(channelNumbers[1])
   if DEV:
-    if TEST3:
+    if TEST2:
       draw_single_con_matrix(maintcon3, 'heat2'+namemod, vmin, vmax)
-      draw_con_matrix(maintcon3, 'heatgrid2'+namemod, vmin, vmax)
+      if GRID:
+        draw_con_matrix(maintcon3, 'heatgrid2'+namemod, vmin, vmax)
       draw_trans_con_matrix(maintcon3, ugraph3, 'heattrans2'+namemod, vmin, vmax)
       draw_tgraph(tgraph3, 'tgraph2'+namemod, 0, None, 't')
       draw_tgraph(ugraph3, 'ugraph2'+namemod, None, 0.05, 'u')
-    draw_single_con_matrix(maintcon2, 'heatm'+namemod, vmin, vmax)
-    draw_con_matrix(maintcon2, 'heatgridm'+namemod, vmin, vmax)
-    draw_trans_con_matrix(maintcon2, ugraph2, 'heattransm'+namemod, vmin, vmax)
-    draw_tgraph(tgraph2, 'tgraphm'+namemod, 0, None, 't')
-    draw_tgraph(ugraph2, 'ugraphm'+namemod, None, 0.05, 'u')
+    if TESTM:
+      draw_single_con_matrix(maintcon2, 'heatm'+namemod, vmin, vmax)
+      if GRID:
+        draw_con_matrix(maintcon2, 'heatgridm'+namemod, vmin, vmax)
+      draw_trans_con_matrix(maintcon2, ugraph2, 'heattransm'+namemod, vmin, vmax)
+      draw_tgraph(tgraph2, 'tgraphm'+namemod, 0, None, 't')
+      draw_tgraph(ugraph2, 'ugraphm'+namemod, None, 0.05, 'u')
   #run_ttest((m1wcon,mmwcon,m2wcon),Tchannels,GOODFREQ)
