@@ -15,9 +15,10 @@ FUDGE = False # this factor is used to enable and mark dubious code, which can b
 DRAW = True #Whether or not to draw the coherence connectivity matrix
 CHECK_NORMALITY = False #Print normality plots
 
-#channelLabels = ['MEG0322', 'MEG0323', 'MEG0342', 'MEG0343', 'MEG0112', 'MEG0113', 'MEG1532', 'MEG1533', 'MEG1712', 'MEG1713']
+channelLabels = ['MEG0122', 'MEG0132', 'MEG1512', 'MEG1522', 'MEG1532', 'MEG1642', 'MEG1722', 'MEG1712'] #left-side longitudinal pairings
+#channelLabels = ['MEG1712', 'MEG1732', 'MEG1932', 'MEG1922', 'MEG2132', 'MEG2342', 'MEG2512', 'MEG2532'] #posterior left-right longitudinal pairings
 #channelLabels = ['MEG0133','MEG1743']
-channelLabels = ['MEG0132','MEG1712']
+#channelLabels = ['MEG0132','MEG1712']
 #channelLabels = ['MEG1732','MEG2543']
 #channelLabels = ['MEG0133','MEG1542']
 #channelLabels = ['MEG0122','MEG0132','MEG0223','MEG1513','MEG1712']
@@ -30,7 +31,7 @@ GOODFREQS3 = [10]
 DEPTH = True #test depth or something else?
 TEST2 = True
 TEST3 = True
-OPTIMAL = False #test u-values of chosen freqs to determine the best freq
+OPTIMAL = True #test u-values of chosen freqs to determine the best freq
 SCAN = True #scan all freqs instead of just the specified ones
 
 if not DEV:
@@ -48,7 +49,7 @@ if not DEV:
 plusminus = 2
 NJOBS = 20 #dignam has 24 processors
 fmin = 4 #minimum frequency of interest (wavelet); 4
-fmax = 20 #maximum frequency of interest (wavelet); 50
+fmax = 50 #maximum frequency of interest (wavelet); 50
 fstep = 1 #stepsize to get from fmin to fmax
 tminsec = 0 #time start to calculate significance over (in seconds)
 tmaxsec = 0.5 #time end to calculate significance over (in seconds)
@@ -396,14 +397,15 @@ def run_ttest(wordesfreqtimes,goodcols,goodfreq):
 #  python ../scripts/expandtab.py hod_JoeTimes_LoadsaFeaturesV4.tab > hod_JoeTimes_LoadsaFeaturesV5.tab
 #  python ../scripts/addparserops.py hod_JoeTimes_LoadsaFeaturesV5.tab hod.wsj02to21-comparativized-gcg15-1671-4sm.fullberk.parsed.gcgparseops > hod_JoeTimes_LoadsaFeaturesV6.tab
 #  python ../scripts/addtotsurp.py hod_JoeTimes_LoadsaFeaturesV6.tab hod.totsurp > hod_JoeTimes_LoadsaFeaturesV7.tab
-#  python ../scripts/addmorphs.py hod_JoeTimes_LoadsaFeaturesV8.tab hod.totsurp > hod_JoeTimes_LoadsaFeaturesV9.tab
-tokenPropsFile = '../MEG_data/hod_JoeTimes_LoadsaFeaturesV8.tab'
+#  V8 just adds filler-gap-sensitive surprisal, so run the fg parser and rerun the totsurp script (after changing the header name)
+#  python ../scripts/addmorphs.py hod_JoeTimes_LoadsaFeaturesV8.tab hod.pretty_morph_annotations > hod_JoeTimes_LoadsaFeaturesV9.tab
+tokenPropsFile = '../MEG_data/hod_JoeTimes_LoadsaFeaturesV9.tab'
 
 # LOAD WORD PROPS
 # change dtype to suit the files in your .tab file #
 tokenProps = scipy.genfromtxt(tokenPropsFile,
                               delimiter='\t',names=True,
-                              dtype="i4,f4,f4,S50,S50,i2,i2,i2,S10,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,i4,>i4,i4,i4,S4,i8")
+                              dtype="i4,f4,f4,S50,S50,i2,i2,i2,S10,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,i4,>i4,i4,i4,S4,i8,i8,i4")
 # ... and temporarily save as cpickle archive to satisfy the way I programmed the convenience function loadBookMEGWithAudio (it expects to find the same info in a C-pickle file, and so doesn't need to know about number and type of fields)
 tokenPropsPickle = tokenPropsFile+'.cpk'
 pickle.dump(tokenProps, open(tokenPropsPickle, 'wb'))
@@ -437,18 +439,10 @@ tokenProps = numpy.concatenate((tokenPropsOrig,tokenPropsOrig,tokenPropsOrig),ax
 # REDUCE TRIALS TO JUST THOSE THAT CONTAIN A REAL WORD (NOT PUNCTUATION, SPACES, ...)
 wordTrialsBool = numpy.array([p != '' for p in tokenProps['stanfPOS']])
 #print(wordTrialsBool[:10])
-# REDUCE TRIALS TO JUST THOSE THAT HAVE A DECENT DEPTH ESTIMATE
-parsedTrialsBool = numpy.array([d != -1 for d in tokenProps['syndepth']])
-d1TrialsBool = numpy.array([d == 1 for d in tokenProps['syndepth']])
-d2TrialsBool = numpy.array([d == 2 for d in tokenProps['syndepth']])
-d3TrialsBool = numpy.array([d == 3 for d in tokenProps['syndepth']])
-d4TrialsBool = numpy.array([d == 4 for d in tokenProps['syndepth']])
-fintegTrialsBool = numpy.array([d < 0 for d in tokenProps['futdeltadepth']]) #location of hypothesized integration cost
-integTrialsBool = numpy.array([d < 0 for d in tokenProps['deltadepth']]) #location of hypothesized integration cost
-storTrialsBool = numpy.array([d > 0 for d in tokenProps['deltadepth']]) #location of hypothesized storage cost
-maintTrialsBool = numpy.array([d == 0 for d in tokenProps['deltadepth']]) #location of hypothesized maintenance cost
-conjBool = numpy.array([o == 'lC' for o in tokenProps['parseop']]) #location of hypothesized conjunction cost
-notConjBool = numpy.array([o != 'lC' for o in tokenProps['parseop']]) #antilocation of hypothesized conjunction cost
+m1TrialsBool = numpy.array([m == 1 for m in tokenProps['morphs']])
+m2TrialsBool = numpy.array([m == 2 for m in tokenProps['morphs']])
+m3TrialsBool = numpy.array([m == 3 for m in tokenProps['morphs']])
+mmTrialsBool = numpy.array([m > 1 for m in tokenProps['morphs']])
 
 sentidlist = numpy.bincount(tokenProps['sentid'][tokenProps['sentid'] != -1]) #gives the sentence length indexed by sentence ID
 sentidlist = sentidlist / float(NUMSUBJS) #account for the fact that we've seen each sentence 3 times (once per subject)
@@ -492,43 +486,31 @@ epochedSignalData = ( numpy.concatenate((epochedSignalData1,epochedSignalData2,e
 
 #acquire datasets
 
-wordEpochs = epochedSignalData[wordTrialsBool & parsedTrialsBool & inDataset]
-d1wordEpochs = epochedSignalData[wordTrialsBool & d1TrialsBool & inDataset]
-d2wordEpochs = epochedSignalData[wordTrialsBool & d2TrialsBool & inDataset]
-d3wordEpochs = epochedSignalData[wordTrialsBool & d3TrialsBool & inDataset]
-integwordEpochs = epochedSignalData[wordTrialsBool & integTrialsBool & inDataset]
-storwordEpochs = epochedSignalData[wordTrialsBool & storTrialsBool & inDataset]
-d2iwordEpochs = epochedSignalData[wordTrialsBool & integTrialsBool & inDataset & d2TrialsBool]
-d2fiwordEpochs = epochedSignalData[wordTrialsBool & fintegTrialsBool & inDataset & d2TrialsBool]
-d2swordEpochs = epochedSignalData[wordTrialsBool & storTrialsBool & inDataset & d2TrialsBool]
-d1mwordEpochs = epochedSignalData[wordTrialsBool & maintTrialsBool & inDataset & d1TrialsBool]
-d2mwordEpochs = epochedSignalData[wordTrialsBool & maintTrialsBool & inDataset & d2TrialsBool]
-d3mwordEpochs = epochedSignalData[wordTrialsBool & maintTrialsBool & inDataset & d3TrialsBool]
-#wordFeatures = tokenProps[wordTrialsBool & parsedTrialsBool & inDataset]
-#mwordEpochs = epochedSignalData[wordTrialsBool & maintTrialsBool & inDataset]
-#mwordFeatures = tokenProps[wordTrialsBool & maintTrialsBool & inDataset]
-#d1wordFeatures = tokenProps[wordTrialsBool & d1TrialsBool & inDataset]
-#d2wordFeatures = tokenProps[wordTrialsBool & d2TrialsBool & inDataset]
-#d3wordFeatures = tokenProps[wordTrialsBool & d3TrialsBool & inDataset]
+wordEpochs = epochedSignalData[wordTrialsBool & inDataset]
+m1wordEpochs = epochedSignalData[wordTrialsBool & m1TrialsBool & inDataset]
+m2wordEpochs = epochedSignalData[wordTrialsBool & m2TrialsBool & inDataset]
+m3wordEpochs = epochedSignalData[wordTrialsBool & m3TrialsBool & inDataset]
+mmwordEpochs = epochedSignalData[wordTrialsBool & mmTrialsBool & inDataset]
 
-conjEpochs = epochedSignalData[wordTrialsBool & parsedTrialsBool & conjBool & inDataset]
-notConjEpochs = epochedSignalData[wordTrialsBool & parsedTrialsBool & notConjBool & inDataset]
+#conjEpochs = epochedSignalData[wordTrialsBool & parsedTrialsBool & conjBool & inDataset]
+#notConjEpochs = epochedSignalData[wordTrialsBool & parsedTrialsBool & notConjBool & inDataset]
 
 if DEPTH:
-  testEpochs1 = d1mwordEpochs
-  testEpochs2 = d2mwordEpochs
+  testEpochs1 = m1wordEpochs
+  testEpochsm = mmwordEpochs
   if TEST3:
-    testEpochs3 = d3mwordEpochs
+    testEpochs2 = m2wordEpochs
 else:
-  testEpochs1 = notConjEpochs
-  testEpochs2 = conjEpochs
-  testEpochs3 = None
+  raise
+#  testEpochs1 = notConjEpochs
+#  testEpochsm = conjEpochs
+#  testEpochs2 = None
 
 if FUDGE:
   testEpochs1 = testEpochs1[:40]
-  testEpochs2 = testEpochs2[:40]
+  testEpochsm = testEpochsm[:40]
   if TEST3:
-    testEpochs3 = testEpochs3[:40]
+    testEpochs2 = testEpochs2[:40]
   
 #COHERENCE ANALYSIS
 #freq_decomp = 'wavelet'
@@ -560,32 +542,32 @@ print 'Calculating coherence'
 #                                                  cwt_frequencies=cwt_frequencies, cwt_n_cycles=cwt_n_cycles, n_jobs=NJOBS, verbose='WARNING')
 
 print 'testEpochs1',testEpochs1.shape
-print 'testEpochs2',testEpochs2.shape
+print 'testEpochsm',testEpochsm.shape
 if TEST3:
-  print 'testEpochs3',testEpochs3.shape
+  print 'testEpochs2',testEpochs2.shape
 
-d1wcon = word_connectivity(testEpochs1, indices=indices, step = coherence_step)
-d2wcon = word_connectivity(testEpochs2, indices=indices, step = coherence_step)
+m1wcon = word_connectivity(testEpochs1, indices=indices, step = coherence_step)
+mmwcon = word_connectivity(testEpochsm, indices=indices, step = coherence_step)
 if TEST3:
-  d3wcon = word_connectivity(testEpochs3, indices=indices, step = coherence_step)
-print 'd1wcon',d1wcon.shape
-print 'd2wcon',d2wcon.shape
+  m2wcon = word_connectivity(testEpochs2, indices=indices, step = coherence_step)
+print 'm1wcon',m1wcon.shape
+print 'mmwcon',mmwcon.shape
 if TEST3:
-  print 'd3wcon',d3wcon.shape
+  print 'm2wcon',m2wcon.shape
 
-d1mcon = numpy.mean(d1wcon,axis=0)
-d2mcon = numpy.mean(d2wcon,axis=0)
+m1mcon = numpy.mean(m1wcon,axis=0)
+mmmcon = numpy.mean(mmwcon,axis=0)
 if TEST3:
-  d3mcon = numpy.mean(d3wcon,axis=0)
+  m2mcon = numpy.mean(m2wcon,axis=0)
 
-d1simplea = numpy.empty((d1wcon.shape[0],len(cwt_frequencies)))
-d2simplea = numpy.empty((d2wcon.shape[0],len(cwt_frequencies)))
+m1simplea = numpy.empty((m1wcon.shape[0],len(cwt_frequencies)))
+m2simplea = numpy.empty((mmwcon.shape[0],len(cwt_frequencies)))
 if TEST3:
-  d3simplea = numpy.empty((d3wcon.shape[0],len(cwt_frequencies)))
-d1simple = numpy.empty((d1wcon.shape[0],len(cwt_frequencies)))
-d2simple = numpy.empty((d2wcon.shape[0],len(cwt_frequencies)))
+  m3simplea = numpy.empty((m2wcon.shape[0],len(cwt_frequencies)))
+m1simple = numpy.empty((m1wcon.shape[0],len(cwt_frequencies)))
+m2simple = numpy.empty((mmwcon.shape[0],len(cwt_frequencies)))
 if TEST3:
-  d3simple = numpy.empty((d3wcon.shape[0],len(cwt_frequencies)))
+  m3simple = numpy.empty((m2wcon.shape[0],len(cwt_frequencies)))
 
 #wordEpochs x chans x chans x freqs x timeSamples
 
@@ -594,38 +576,38 @@ if TEST3:
 #print d1wcon[0,1,0,0,0:10]
 #print d1wcon[1,1,0,0,0:10]
 #print d1wcon[2,1,0,0,0:10]
-#print d2wcon[0,1,0,0,0:10]
-#print d3wcon[0,1,0,0,0:10]
+#print mmwcon[0,1,0,0,0:10]
+#print m2wcon[0,1,0,0,0:10]
 #print numpy.mean(d1wcon[0,1,0,0])
 #print numpy.mean(d1wcon[0,1,1,0])
 
-for i in xrange(d1simple.shape[0]):
-  for fi in xrange(d1simple.shape[1]):
-    d1simplea[i,fi] = numpy.mean(d1wcon[i,1,0,fi,tmin:tmax])
-for i in xrange(d2simple.shape[0]):
-  for fi in xrange(d2simple.shape[1]):
-    d2simplea[i,fi] = numpy.mean(d2wcon[i,1,0,fi,tmin:tmax])
+for i in xrange(m1simple.shape[0]):
+  for fi in xrange(m1simple.shape[1]):
+    m1simplea[i,fi] = numpy.mean(m1wcon[i,1,0,fi,tmin:tmax])
+for i in xrange(m2simple.shape[0]):
+  for fi in xrange(m2simple.shape[1]):
+    m2simplea[i,fi] = numpy.mean(mmwcon[i,1,0,fi,tmin:tmax])
 if TEST3:
-  for i in xrange(d3simple.shape[0]):
-    for fi in xrange(d3simple.shape[1]):
-      d3simplea[i,fi] = numpy.mean(d3wcon[i,1,0,fi,tmin:tmax])
+  for i in xrange(m3simple.shape[0]):
+    for fi in xrange(m3simple.shape[1]):
+      m3simplea[i,fi] = numpy.mean(m2wcon[i,1,0,fi,tmin:tmax])
 if plusminus != 0:
   #average over multiple frequencies
-  for i in xrange(d1simple.shape[0]):
-    for fi in xrange(d1simple.shape[1]):
-      d1simple[i,fi] = numpy.mean(d1simplea[i,max(0,fi-plusminus):min(d1simple.shape[1],fi+plusminus+1)])
-  for i in xrange(d2simple.shape[0]):
-    for fi in xrange(d2simple.shape[1]):
-      d2simple[i,fi] = numpy.mean(d2simplea[i,max(0,fi-plusminus):min(d2simple.shape[1],fi+plusminus+1)])
+  for i in xrange(m1simple.shape[0]):
+    for fi in xrange(m1simple.shape[1]):
+      m1simple[i,fi] = numpy.mean(m1simplea[i,max(0,fi-plusminus):min(m1simple.shape[1],fi+plusminus+1)])
+  for i in xrange(m2simple.shape[0]):
+    for fi in xrange(m2simple.shape[1]):
+      m2simple[i,fi] = numpy.mean(m2simplea[i,max(0,fi-plusminus):min(m2simple.shape[1],fi+plusminus+1)])
   if TEST3:
-    for i in xrange(d3simple.shape[0]):
-      for fi in xrange(d3simple.shape[1]):
-        d3simple[i,fi] = numpy.mean(d3simplea[i,max(0,fi-plusminus):min(d3simple.shape[1],fi+plusminus+1)])
+    for i in xrange(m3simple.shape[0]):
+      for fi in xrange(m3simple.shape[1]):
+        m3simple[i,fi] = numpy.mean(m3simplea[i,max(0,fi-plusminus):min(m3simple.shape[1],fi+plusminus+1)])
 else:
-  d1simple = d1simplea
-  d2simple = d2simplea
+  m1simple = m1simplea
+  m2simple = m2simplea
   if TEST3:
-    d3simple = d3simplea
+    m3simple = m3simplea
 
 conpkg = {'conmats':[],'freqs':freqs,'electrodes':channelLabels}
 
@@ -638,87 +620,87 @@ if TEST3:
 if SAVEDATA:
   print 'Writing coherence metrics to disk'
 
-  conpkg['conmats'] = d1wcon
-  with open(SAVEDIR+'cohd1m.pkl','wb') as f:
+  conpkg['conmats'] = m1wcon
+  with open(SAVEDIR+'cohm1m.pkl','wb') as f:
     pickle.dump(conpkg,f)
-  conpkg['conmats'] = d2wcon
-  with open(SAVEDIR+'cohd2m.pkl','wb') as f:
+  conpkg['conmats'] = mmwcon
+  with open(SAVEDIR+'cohm2m.pkl','wb') as f:
     pickle.dump(conpkg,f)
   if TEST3:
-    conpkg['conmats'] = d3wcon
-    with open(SAVEDIR+'cohd3m.pkl','wb') as f:
+    conpkg['conmats'] = m2wcon
+    with open(SAVEDIR+'cohm3m.pkl','wb') as f:
       pickle.dump(conpkg,f)
 
 if DEV:
   for fi in xrange(len(cwt_frequencies)):
-    tgraph2[fi] = abs(scipy.stats.f_oneway(d1simple[:,fi],d2simple[:,fi])[0])
-    ugraph2[fi] = abs(scipy.stats.mannwhitneyu(d1simple[:,fi],d2simple[:,fi])[1])
+    tgraph2[fi] = abs(scipy.stats.f_oneway(m1simple[:,fi],m2simple[:,fi])[0])
+    ugraph2[fi] = abs(scipy.stats.mannwhitneyu(m1simple[:,fi],m2simple[:,fi])[1])
     if TEST3:
-      tgraph3[fi] = abs(scipy.stats.f_oneway(d2simple[:,fi],d3simple[:,fi])[0])
-      ugraph3[fi] = abs(scipy.stats.mannwhitneyu(d2simple[:,fi],d3simple[:,fi])[1])
+      tgraph3[fi] = abs(scipy.stats.f_oneway(m2simple[:,fi],m3simple[:,fi])[0])
+      ugraph3[fi] = abs(scipy.stats.mannwhitneyu(m2simple[:,fi],m3simple[:,fi])[1])
 if OPTIMAL:
   if TEST2:
     for col in numpy.where(ugraph2 < 0.05)[0].ravel():
-      print 'd2-d1:', cwt_frequencies[col], 'Hz:', numpy.mean(d2simple,axis=0)[col],'-', numpy.mean(d1simple,axis=0)[col],'p=', scipy.stats.f_oneway(d1simple[:,col],d2simple[:,col]), 'u=',scipy.stats.mannwhitneyu(d1simple[:,col],d2simple[:,col])
-      print 'variance:',numpy.var(numpy.concatenate((d1simple[:,col],d2simple[:,col]),axis=0)), 'stddev:',numpy.std(numpy.concatenate((d1simple[:,col],d2simple[:,col]),axis=0)), 'stddevA:',numpy.std(d2simple[:,col]), 'stddevB:',numpy.std(d1simple[:,col])
+      print 'm2-m1:', cwt_frequencies[col], 'Hz:', numpy.mean(m2simple,axis=0)[col],'-', numpy.mean(m1simple,axis=0)[col],'p=', scipy.stats.f_oneway(m1simple[:,col],m2simple[:,col]), 'u=',scipy.stats.mannwhitneyu(m1simple[:,col],m2simple[:,col])
+      print 'variance:',numpy.var(numpy.concatenate((m1simple[:,col],m2simple[:,col]),axis=0)), 'stddev:',numpy.std(numpy.concatenate((m1simple[:,col],m2simple[:,col]),axis=0)), 'stddevA:',numpy.std(m2simple[:,col]), 'stddevB:',numpy.std(m1simple[:,col])
   if TEST3:
     for col in numpy.where(ugraph3 < 0.05)[0].ravel():
-      print 'd3-d2:', cwt_frequencies[col], 'Hz:', numpy.mean(d3simple,axis=0)[col],'-', numpy.mean(d2simple,axis=0)[col],'p=', scipy.stats.f_oneway(d2simple[:,col],d3simple[:,col]),'u=', scipy.stats.mannwhitneyu(d2simple[:,col],d3simple[:,col])
+      print 'm3-m2:', cwt_frequencies[col], 'Hz:', numpy.mean(m3simple,axis=0)[col],'-', numpy.mean(m2simple,axis=0)[col],'p=', scipy.stats.f_oneway(m2simple[:,col],m3simple[:,col]),'u=', scipy.stats.mannwhitneyu(m2simple[:,col],m3simple[:,col])
 else:
   for col in GOODFREQS-fmin:
     if TEST2:
       if DEV or (not DEV and col in GOODFREQS2-fmin):
-        print 'd2-d1:', cwt_frequencies[col], 'Hz:', numpy.mean(d2simple,axis=0)[col],'-', numpy.mean(d1simple,axis=0)[col],'p=', scipy.stats.f_oneway(d1simple[:,col],d2simple[:,col]), 'u=',scipy.stats.mannwhitneyu(d1simple[:,col],d2simple[:,col])
-        print 'variance:',numpy.var(numpy.concatenate((d1simple[:,col],d2simple[:,col]),axis=0)), 'stddev:',numpy.std(numpy.concatenate((d1simple[:,col],d2simple[:,col]),axis=0)), 'stddevA:',numpy.std(d2simple[:,col]), 'stddevB:',numpy.std(d1simple[:,col])
+        print 'm2-m1:', cwt_frequencies[col], 'Hz:', numpy.mean(m2simple,axis=0)[col],'-', numpy.mean(m1simple,axis=0)[col],'p=', scipy.stats.f_oneway(m1simple[:,col],m2simple[:,col]), 'u=',scipy.stats.mannwhitneyu(m1simple[:,col],m2simple[:,col])
+        print 'variance:',numpy.var(numpy.concatenate((m1simple[:,col],m2simple[:,col]),axis=0)), 'stddev:',numpy.std(numpy.concatenate((m1simple[:,col],m2simple[:,col]),axis=0)), 'stddevA:',numpy.std(m2simple[:,col]), 'stddevB:',numpy.std(m1simple[:,col])
         if CHECK_NORMALITY:
-          scipy.stats.probplot(d1simple[:,col], dist="norm", plot=plt)
+          scipy.stats.probplot(m1simple[:,col], dist="norm", plot=plt)
           plt.savefig('graphics/norm1.png')
           plt.close("all")
-          scipy.stats.probplot(d2simple[:,col], dist="norm", plot=plt)
+          scipy.stats.probplot(m2simple[:,col], dist="norm", plot=plt)
           plt.savefig('graphics/norm2.png')
           plt.close("all")
     if TEST3:
       if DEV or (not DEV and col in GOODFREQS3-fmin):
-        print 'd3-d2:', cwt_frequencies[col], 'Hz:', numpy.mean(d3simple,axis=0)[col],'-', numpy.mean(d2simple,axis=0)[col],'p=', scipy.stats.f_oneway(d2simple[:,col],d3simple[:,col]),'u=', scipy.stats.mannwhitneyu(d2simple[:,col],d3simple[:,col])
-        print 'variance:',numpy.var(numpy.concatenate((d1simple[:,col],d2simple[:,col]),axis=0)), 'stddev:',numpy.std(numpy.concatenate((d1simple[:,col],d2simple[:,col]),axis=0))
+        print 'm3-m2:', cwt_frequencies[col], 'Hz:', numpy.mean(m3simple,axis=0)[col],'-', numpy.mean(m2simple,axis=0)[col],'p=', scipy.stats.f_oneway(m2simple[:,col],m3simple[:,col]),'u=', scipy.stats.mannwhitneyu(m2simple[:,col],m3simple[:,col])
+        print 'variance:',numpy.var(numpy.concatenate((m1simple[:,col],m2simple[:,col]),axis=0)), 'stddev:',numpy.std(numpy.concatenate((m1simple[:,col],m2simple[:,col]),axis=0))
         if CHECK_NORMALITY:
-          scipy.stats.probplot(d3simple[:,col], dist="norm", plot=plt)
+          scipy.stats.probplot(m3simple[:,col], dist="norm", plot=plt)
           plt.savefig('graphics/norm3.png')
           plt.close("all")    
       
 ##save for later
-#with open('d1con.pkl','wb') as f:
-#  pickle.dump(d1con,f)
+#with open('m1con.pkl','wb') as f:
+#  pickle.dump(m1con,f)
 #  
 ##Depth 2 coherence
-#d2con, freqs, times, _, _ = spectral_connectivity(d2wordEpochs, indices=indices,
+#m2con, freqs, times, _, _ = spectral_connectivity(m2wordEpochs, indices=indices,
 #                                                  method='coh', mode='cwt_morlet', sfreq=samplingRate,
 #                                                  cwt_frequencies=cwt_frequencies, cwt_n_cycles=cwt_n_cycles, n_jobs=NJOBS, verbose='WARNING')
 ##save for later
-#with open('d2con.pkl','wb') as f:
-#  pickle.dump(d2con,f)
+#with open('m2con.pkl','wb') as f:
+#  pickle.dump(m2con,f)
 ##Depth 3 coherence
-#d3con, freqs, times, _, _ = spectral_connectivity(d3wordEpochs, indices=indices,
+#m3con, freqs, times, _, _ = spectral_connectivity(m3wordEpochs, indices=indices,
 #                                                  method='coh', mode='cwt_morlet', sfreq=samplingRate,
 #                                                  cwt_frequencies=cwt_frequencies, cwt_n_cycles=cwt_n_cycles, n_jobs=NJOBS, verbose='WARNING')
 ##save for later
-#with open('d3con.pkl','wb') as f:
-#  pickle.dump(d3con,f)
+#with open('m3con.pkl','wb') as f:
+#  pickle.dump(m3con,f)
 #Storage coherence
-#d2scon, freqs, times, _, _ = spectral_connectivity(d2swordEpochs, indices=indices,
+#m2scon, freqs, times, _, _ = spectral_connectivity(m2swordEpochs, indices=indices,
 #                                                  method='coh', mode='cwt_morlet', sfreq=samplingRate,
 #                                                  cwt_frequencies=cwt_frequencies, cwt_n_cycles=cwt_n_cycles, n_jobs=NJOBS, verbose='WARNING')
-#d2mcon, freqs, times, _, _ = spectral_connectivity(d2mwordEpochs, indices=indices,
+#mmmcon, freqs, times, _, _ = spectral_connectivity(m2mwordEpochs, indices=indices,
 #                                                  method='coh', mode='cwt_morlet', sfreq=samplingRate,
 #                                                  cwt_frequencies=cwt_frequencies, cwt_n_cycles=cwt_n_cycles, n_jobs=NJOBS, verbose='WARNING')
 #print 'freqs',freqs
-#d3mcon, freqs, times, _, _ = spectral_connectivity(d3mwordEpochs, indices=indices,
+#m2mcon, freqs, times, _, _ = spectral_connectivity(m3mwordEpochs, indices=indices,
 #                                                  method='coh', mode='cwt_morlet', sfreq=samplingRate,
 #                                                  cwt_frequencies=cwt_frequencies, cwt_n_cycles=cwt_n_cycles, n_jobs=NJOBS, verbose='WARNING')
-#d2icon, freqs, times, _, _ = spectral_connectivity(d2iwordEpochs, indices=indices,
+#m2icon, freqs, times, _, _ = spectral_connectivity(m2iwordEpochs, indices=indices,
 #                                                  method='coh', mode='cwt_morlet', sfreq=samplingRate,
 #                                                  cwt_frequencies=cwt_frequencies, cwt_n_cycles=cwt_n_cycles, n_jobs=NJOBS, verbose='WARNING')
-#d2ficon, freqs, times, _, _ = spectral_connectivity(d2fiwordEpochs, indices=indices,
+#m2ficon, freqs, times, _, _ = spectral_connectivity(m2fiwordEpochs, indices=indices,
 #                                                  method='coh', mode='cwt_morlet', sfreq=samplingRate,
 #                                                  cwt_frequencies=cwt_frequencies, cwt_n_cycles=cwt_n_cycles, n_jobs=NJOBS, verbose='WARNING')
 #save for later
@@ -732,21 +714,21 @@ else:
 #with open('integcon.pkl','wb') as f:
 #  pickle.dump(integcon,f)
 
-#vmin = min(min(d1con.ravel()),min(d2con.ravel()),min(d3con.ravel()))
-#vmax = max(max(d1con.ravel()),max(d2con.ravel()),max(d3con.ravel()))
-#draw_con_matrix(d1con, 'd1', vmin, vmax)
-#draw_con_matrix(d2con, 'd2', vmin, vmax)
-#draw_con_matrix(d3con, 'd3', vmin, vmax)
+#vmin = min(min(m1con.ravel()),min(m2con.ravel()),min(m3con.ravel()))
+#vmax = max(max(m1con.ravel()),max(m2con.ravel()),max(m3con.ravel()))
+#draw_con_matrix(m1con, 'm1', vmin, vmax)
+#draw_con_matrix(m2con, 'm2', vmin, vmax)
+#draw_con_matrix(m3con, 'm3', vmin, vmax)
 #draw_con_matrix(d4con, 'd4', vmin, vmax)
 
 #Do storage and integration analyses
-#integcon = d2icon - d2mcon
-#fintegcon = d2ficon - d2mcon
-#storcon = d2scon - d2mcon
+#integcon = m2icon - mmmcon
+#fintegcon = m2ficon - mmmcon
+#storcon = m2scon - mmmcon
 
 #conpkg = {'conmats':[],'freqs':freqs,'electrodes':channelLabels}
-#conpkg['conmats'].append(d32simple)
-#conpkg['conmats'].append(d21simple)
+#conpkg['conmats'].append(m32simple)
+#conpkg['conmats'].append(m21simple)
 #if DEV:
 #  pklname = 'con_dev.pkl'
 #else:
@@ -756,8 +738,8 @@ else:
 
 if DRAW:
   if TEST3:
-    maintcon3 = d3mcon - d2mcon
-  maintcon2 = d2mcon - d1mcon
+    maintcon3 = m2mcon - m1mcon
+  maintcon2 = mmmcon - m1mcon
 
   vmin = None
   vmax = None
@@ -793,12 +775,14 @@ if DRAW:
   namemod = str(plusminus)+'_'+str(channelNumbers[0])+'-'+str(channelNumbers[1])
   if DEV:
     if TEST3:
-      draw_single_con_matrix(maintcon3, 'maintenance3'+namemod, vmin, vmax)
-      draw_trans_con_matrix(maintcon3, ugraph3, 'transmaintenance3'+namemod, vmin, vmax)
-      draw_tgraph(tgraph3, 'tgraph3'+namemod, 0, None, 't')
-      draw_tgraph(ugraph3, 'ugraph3'+namemod, None, 0.05, 'u')
-    draw_single_con_matrix(maintcon2, 'maintenance2'+namemod, vmin, vmax)
-    draw_trans_con_matrix(maintcon2, ugraph2, 'transmaintenance2'+namemod, vmin, vmax)
-    draw_tgraph(tgraph2, 'tgraph2'+namemod, 0, None, 't')
-    draw_tgraph(ugraph2, 'ugraph2'+namemod, None, 0.05, 'u')
-  #run_ttest((d1wcon,d2wcon,d3wcon),Tchannels,GOODFREQ)
+      draw_single_con_matrix(maintcon3, 'heat2'+namemod, vmin, vmax)
+      draw_con_matrix(maintcon3, 'heatgrid2'+namemod, vmin, vmax)
+      draw_trans_con_matrix(maintcon3, ugraph3, 'heattrans2'+namemod, vmin, vmax)
+      draw_tgraph(tgraph3, 'tgraph2'+namemod, 0, None, 't')
+      draw_tgraph(ugraph3, 'ugraph2'+namemod, None, 0.05, 'u')
+    draw_single_con_matrix(maintcon2, 'heatm'+namemod, vmin, vmax)
+    draw_con_matrix(maintcon2, 'heatgridm'+namemod, vmin, vmax)
+    draw_trans_con_matrix(maintcon2, ugraph2, 'heattransm'+namemod, vmin, vmax)
+    draw_tgraph(tgraph2, 'tgraphm'+namemod, 0, None, 't')
+    draw_tgraph(ugraph2, 'ugraphm'+namemod, None, 0.05, 'u')
+  #run_ttest((m1wcon,mmwcon,m2wcon),Tchannels,GOODFREQ)
