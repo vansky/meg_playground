@@ -16,10 +16,10 @@ DRAW = True #Whether or not to draw the coherence connectivity matrix
 CHECK_NORMALITY = False #Print normality plots
 
 #channelLabels = ['MEG0122', 'MEG0132', 'MEG1512', 'MEG1522', 'MEG1532', 'MEG1642', 'MEG1722', 'MEG1712'] #left-side longitudinal pairings
-#channelLabels = ['MEG1712', 'MEG1732', 'MEG1932', 'MEG1922', 'MEG2132', 'MEG2342', 'MEG2512', 'MEG2532'] #posterior left-right longitudinal pairings
-channelLabels = ['MEG0122','MEG1512']
-#channelLabels = ['MEG0132','MEG1512']
-#channelLabels = ['MEG1642','MEG1722']
+channelLabels = ['MEG1712', 'MEG1732', 'MEG1932', 'MEG1922', 'MEG2132', 'MEG2342', 'MEG2512', 'MEG2532'] #posterior left-right longitudinal pairings
+#channelLabels = ['MEG0122','MEG1512'] #lhs
+#channelLabels = ['MEG0132','MEG1512'] #lhs
+#channelLabels = ['MEG1642','MEG1722'] #lhs
 
 # GOODFREQS = the frequencies to significance test for
 GOODFREQS = [10]
@@ -28,9 +28,9 @@ GOODFREQS3 = [10]
 
 #GOODFREQS = [6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46]
 DEPTH = True #test depth or something else?
-TESTM = False
+TESTM = True
 TEST2 = True
-GRID = False #plot multi-sensor coherence grid
+GRID = True #plot multi-sensor coherence grid
 OPTIMAL = True #test u-values of chosen freqs to determine the best freq
 SCAN = True #scan all freqs instead of just the specified ones
 
@@ -654,8 +654,8 @@ if DEV:
       tgraph2[fi] = abs(scipy.stats.f_oneway(m1simple[:,fi],m2simple[:,fi])[0])
       ugraph2[fi] = abs(scipy.stats.mannwhitneyu(m1simple[:,fi],m2simple[:,fi])[1])
     if TEST2:
-      tgraph3[fi] = abs(scipy.stats.f_oneway(m2simple[:,fi],m3simple[:,fi])[0])
-      ugraph3[fi] = abs(scipy.stats.mannwhitneyu(m2simple[:,fi],m3simple[:,fi])[1])
+      tgraph3[fi] = abs(scipy.stats.f_oneway(m1simple[:,fi],m3simple[:,fi])[0])
+      ugraph3[fi] = abs(scipy.stats.mannwhitneyu(m1simple[:,fi],m3simple[:,fi])[1])
 if OPTIMAL:
   if TESTM:
     for col in numpy.where(ugraph2 < 0.05)[0].ravel():
@@ -663,7 +663,7 @@ if OPTIMAL:
       print 'variance:',numpy.var(numpy.concatenate((m1simple[:,col],m2simple[:,col]),axis=0)), 'stddev:',numpy.std(numpy.concatenate((m1simple[:,col],m2simple[:,col]),axis=0)), 'stddevA:',numpy.std(m2simple[:,col]), 'stddevB:',numpy.std(m1simple[:,col])
   if TEST2:
     for col in numpy.where(ugraph3 < 0.05)[0].ravel():
-      print 'm3-m2:', cwt_frequencies[col], 'Hz:', numpy.mean(m3simple,axis=0)[col],'-', numpy.mean(m2simple,axis=0)[col],'p=', scipy.stats.f_oneway(m2simple[:,col],m3simple[:,col]),'u=', scipy.stats.mannwhitneyu(m2simple[:,col],m3simple[:,col])
+      print 'm3-m2:', cwt_frequencies[col], 'Hz:', numpy.mean(m3simple,axis=0)[col],'-', numpy.mean(m1simple,axis=0)[col],'p=', scipy.stats.f_oneway(m1simple[:,col],m3simple[:,col]),'u=', scipy.stats.mannwhitneyu(m1simple[:,col],m3simple[:,col])
 else:
   for col in GOODFREQS-fmin:
     if TESTM:
@@ -679,8 +679,8 @@ else:
           plt.close("all")
     if TEST2:
       if DEV or (not DEV and col in GOODFREQS3-fmin):
-        print 'm3-m2:', cwt_frequencies[col], 'Hz:', numpy.mean(m3simple,axis=0)[col],'-', numpy.mean(m2simple,axis=0)[col],'p=', scipy.stats.f_oneway(m2simple[:,col],m3simple[:,col]),'u=', scipy.stats.mannwhitneyu(m2simple[:,col],m3simple[:,col])
-        print 'variance:',numpy.var(numpy.concatenate((m1simple[:,col],m2simple[:,col]),axis=0)), 'stddev:',numpy.std(numpy.concatenate((m1simple[:,col],m2simple[:,col]),axis=0))
+        print 'm3-m2:', cwt_frequencies[col], 'Hz:', numpy.mean(m3simple,axis=0)[col],'-', numpy.mean(m1simple,axis=0)[col],'p=', scipy.stats.f_oneway(m1simple[:,col],m3simple[:,col]),'u=', scipy.stats.mannwhitneyu(m1simple[:,col],m3simple[:,col])
+        print 'variance:',numpy.var(numpy.concatenate((m1simple[:,col],m3simple[:,col]),axis=0)), 'stddev:',numpy.std(numpy.concatenate((m1simple[:,col],m3simple[:,col]),axis=0))
         if CHECK_NORMALITY:
           scipy.stats.probplot(m3simple[:,col], dist="norm", plot=plt)
           plt.savefig('graphics/norm3.png')
